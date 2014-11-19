@@ -18,6 +18,7 @@ public:
     ~MainWindow();
 
 private:
+    QThread *thread;
     Sniffer *sniffer;
     Ui::MainWindow *ui;
 

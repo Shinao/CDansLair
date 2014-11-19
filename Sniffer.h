@@ -11,6 +11,8 @@
 #include <sstream>
 #include <vector>
 #include <cstdint>
+#include <QtDebug>
+#include <QObject>
 
 #define LogError std::cout<<"Error On Line: "<<__LINE__<<" in File: "<<__FILE__<<"\n"
 std::string ErrorMessage(std::uint32_t Error, bool Throw);
@@ -79,27 +81,34 @@ typedef struct udp_hdr
     unsigned short udp_checksum;
 } UDP_HDR;
 
-class Sniffer
+struct SniffedPacket
 {
+    std::string ip_source;
+    std::string ip_dest;
+};
+
+class Sniffer : public QObject
+{
+    Q_OBJECT
+
     public:
         Sniffer();
         ~Sniffer();
-        void RemoveSourceIP(std::string OldIP);
-        void RemoveDestinationIP(std::string OldIP);
-        void AddDestinationIP(std::string NewIP);
-        void AddSourceIP(std::string NewIP);
         int GetInterface();
         void SetInterface(int Interf);
         bool Initialize();
         void DeInitialize();
-        void Start();
+
         void Stop();
-        void FilterIP(bool FilterIPs);
-        void ListenSource(bool Listen);
-        void ListenDestination(bool Listen);
         char *Buffer;
         std::string GetIP(std::string Address);
-       // void Test();
+
+        std::list<SniffedPacket *> Packets;
+        QMutex  mutex;
+
+public slots:
+        void Start();
+
     private:
         SOCKET SniffSocket;
         int Interface;
@@ -114,7 +123,6 @@ class Sniffer
         void HandleTCP();
         void HandleUDP();
         void Packet();
-        bool StringArrayContains(std::vector<std::string> Array, std::string Element);
         std::string PrintBuffer(char* data, int s);
         int BuffSize;
         bool Filter;
@@ -124,13 +132,6 @@ class Sniffer
         TCP_HDR *tcphdr;
         ICMP_HDR *icmphdr;
         UDP_HDR *udphdr;
-};
-
-
-class Test
-{
-public:
-    Test();
 };
 
 #endif // SNIFFER_H_INCLUDED

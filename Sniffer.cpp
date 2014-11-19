@@ -33,46 +33,6 @@ Sniffer::~Sniffer()
     this->DeInitialize();
 }
 
-bool Sniffer::StringArrayContains(std::vector<std::string> Array, std::string Element)
-{
-    for (unsigned int I = 0; I < Array.size(); I++)
-    {
-        if (Array.at(I) == Element)
-        {
-            return true;
-        }
-    }
-    return false;
-}
-
-void Sniffer::RemoveSourceIP(std::string OldIP)
-{
-    if (!this->StringArrayContains(this->SourceIP, OldIP))
-        return;
-    this->SourceIP.erase(std::remove(this->SourceIP.begin(), this->SourceIP.end(), OldIP), this->SourceIP.end());
-}
-
-void Sniffer::RemoveDestinationIP(std::string OldIP)
-{
-    if (!this->StringArrayContains(this->DestinationIP, OldIP))
-        return;
-    this->DestinationIP.erase(std::remove(this->DestinationIP.begin(), this->DestinationIP.end(), OldIP), this->DestinationIP.end());
-}
-
-void Sniffer::AddSourceIP(std::string NewIP)
-{
-    if (this->StringArrayContains(this->SourceIP, NewIP))
-        return;
-    this->SourceIP.push_back(NewIP);
-}
-
-void Sniffer::AddDestinationIP(std::string NewIP)
-{
-    if (this->StringArrayContains(this->DestinationIP, NewIP))
-        return;
-    this->DestinationIP.push_back(NewIP);
-}
-
 void Sniffer::Error()
 {
     this->DeInitialize();
@@ -233,21 +193,6 @@ void Sniffer::HandleUDP()
     this->udphdr = (UDP_HDR*)(this->Buffer + IPHDR_LENGTH);
 }
 
-void Sniffer::FilterIP(bool FilterIPs)
-{
-    this->Filter = FilterIPs;
-}
-
-void Sniffer::ListenSource(bool Listen)
-{
-    this->SniffSource = Listen;
-}
-
-void Sniffer::ListenDestination(bool Listen)
-{
-    this->SniffDestination = Listen;
-}
-
 void Sniffer::Packet()
 {
     this->iphdr = (IPV4_HDR*)this->Buffer;
@@ -255,21 +200,15 @@ void Sniffer::Packet()
     this->Source.sin_addr.s_addr = this->iphdr->ip_srcaddr;
     memset(&this->Destination, 0, sizeof(this->Destination));
     this->Destination.sin_addr.s_addr = this->iphdr->ip_destaddr;
-    if (this->Filter)
-    {
-        if (!(this->SniffSource && this->SniffDestination))
-        {
-            if (this->SniffSource && !this->StringArrayContains(this->SourceIP, inet_ntoa(this->Source.sin_addr)))
-                return;
-            if (this->SniffDestination && !this->StringArrayContains(this->DestinationIP, inet_ntoa(this->Destination.sin_addr)))
-                return;
-        } else
-        {
-            if (!(this->StringArrayContains(this->SourceIP, inet_ntoa(this->Source.sin_addr))) &&
-                !(this->StringArrayContains(this->DestinationIP, inet_ntoa(this->Destination.sin_addr))))
-                    return;
-        }
-    }
+    mutex.lock();
+    SniffedPacket *p = new SniffedPacket();
+    Packets.push_back(p);
+    p->ip_source = inet_ntoa(this->Source.sin_addr);
+    p->ip_dest = inet_ntoa(this->Destination.sin_addr);
+    mutex.unlock();
+
+    return ;
+
     std::cout << "Source : " << inet_ntoa(this->Source.sin_addr);
     std::cout << " Destination : " << inet_ntoa(this->Destination.sin_addr);
     std::cout << std::endl;
