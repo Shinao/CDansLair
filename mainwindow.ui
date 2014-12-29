@@ -17,11 +17,21 @@
    <layout class="QGridLayout" name="gridLayout">
     <item row="0" column="0">
      <widget class="QTableWidget" name="tableWidget">
-      <column>
-       <property name="text">
-        <string>ID</string>
-       </property>
-      </column>
+      <property name="alternatingRowColors">
+       <bool>true</bool>
+      </property>
+      <property name="selectionMode">
+       <enum>QAbstractItemView::SingleSelection</enum>
+      </property>
+      <attribute name="horizontalHeaderDefaultSectionSize">
+       <number>120</number>
+      </attribute>
+      <attribute name="horizontalHeaderShowSortIndicator" stdset="0">
+       <bool>true</bool>
+      </attribute>
+      <attribute name="horizontalHeaderStretchLastSection">
+       <bool>true</bool>
+      </attribute>
       <column>
        <property name="text">
         <string>Source</string>
@@ -34,12 +44,17 @@
       </column>
       <column>
        <property name="text">
+        <string>Length</string>
+       </property>
+      </column>
+      <column>
+       <property name="text">
         <string>Protocol</string>
        </property>
       </column>
       <column>
        <property name="text">
-        <string>Length</string>
+        <string>Information</string>
        </property>
       </column>
      </widget>

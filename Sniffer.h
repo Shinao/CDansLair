@@ -14,14 +14,9 @@
 #include <QtDebug>
 #include <QObject>
 
-#define LogError std::cout<<"Error On Line: "<<__LINE__<<" in File: "<<__FILE__<<"\n"
-std::string ErrorMessage(std::uint32_t Error, bool Throw);
-
 #define ICMP 1
 #define TCP 6
 #define UDP 17
-
-
 
 typedef struct ip_hdr
 {
@@ -85,6 +80,10 @@ struct SniffedPacket
 {
     std::string ip_source;
     std::string ip_dest;
+    int         size;
+    QString     info;
+    QString     protocol;
+    char        *data;
 };
 
 class Sniffer : public QObject
@@ -94,44 +93,51 @@ class Sniffer : public QObject
     public:
         Sniffer();
         ~Sniffer();
-        int GetInterface();
-        void SetInterface(int Interf);
-        bool Initialize();
-        void DeInitialize();
+        int         GetInterface();
+        void        SetInterface(int Interf);
+        bool        Initialize();
+        void        DeInitialize();
 
-        void Stop();
-        char *Buffer;
+        // Manipulation
+        void        Stop();
+        char        *data;
         std::string GetIP(std::string Address);
 
+        // Thread
         std::list<SniffedPacket *> Packets;
-        QMutex  mutex;
+        QMutex                     mutex;
 
 public slots:
         void Start();
 
     private:
-        SOCKET SniffSocket;
-        int Interface;
+        // Socket
+        SOCKET              SniffSocket;
+        int                 Interface;
         std::vector<std::string> SourceIP;
         std::vector<std::string> DestinationIP;
-        bool Initialized;
-        bool Sniffing;
-        struct sockaddr_in Source, Destination;
-        void Error();
-        void Sniff();
-        void HandleICMP();
-        void HandleTCP();
-        void HandleUDP();
-        void Packet();
+        bool                Initialized;
+        bool                Sniffing;
+        struct sockaddr_in  Source, Destination;
+
+        // Handle packets
+        void        Sniff();
+        void        ManagePacket();
+        void        ICMPPacket(SniffedPacket &packet);
+        void        TCPPacket(SniffedPacket &packet);
+        void        UDPPacket(SniffedPacket &packet);
         std::string PrintBuffer(char* data, int s);
-        int BuffSize;
-        bool Filter;
-        bool SniffSource;
-        bool SniffDestination;
-        IPV4_HDR *iphdr;
-        TCP_HDR *tcphdr;
-        ICMP_HDR *icmphdr;
-        UDP_HDR *udphdr;
+        bool        ManageError(const std::string &msg);
+
+        // Current packet info
+        int         data_size;
+        bool        Filter;
+        bool        SniffSource;
+        bool        SniffDestination;
+        IPV4_HDR    *iphdr;
+        TCP_HDR     *tcphdr;
+        ICMP_HDR    *icmphdr;
+        UDP_HDR     *udphdr;
 };
 
 #endif // SNIFFER_H_INCLUDED

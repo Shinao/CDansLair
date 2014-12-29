@@ -1,19 +1,5 @@
 #include "Sniffer.h"
 
-
-std::string ErrorMessage(std::uint32_t Error, bool Throw)
-{
-    LPTSTR lpMsgBuf = nullptr;
-    FormatMessage(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, nullptr, Error, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), reinterpret_cast<LPTSTR>(&lpMsgBuf), 0, nullptr);
-    LogError;
-    if (Throw)
-    {
-        //throw std::runtime_error(lpMsgBuf);
-    }
-    return ("");
-    //return lpMsgBuf;
-}
-
 Sniffer::Sniffer()
 {
     this->Initialized = false;
@@ -24,32 +10,42 @@ Sniffer::Sniffer()
     this->Interface = 0;
 }
 
-/*void Sniffer::Test()
-{
-}*/
-
 Sniffer::~Sniffer()
 {
     this->DeInitialize();
 }
 
-void Sniffer::Error()
+void Sniffer::Start()
 {
-    this->DeInitialize();
-    ErrorMessage(WSAGetLastError(), true);
+    this->Sniffing = true;
+    this->Sniff();
+}
+
+void Sniffer::Stop()
+{
+    this->Sniffing = false;
+}
+
+bool    Sniffer::ManageError(const std::string &msg)
+{
+    std::cerr << "Error : " << msg << std::endl;
+    std::cerr << "Windows Error ID : " << WSAGetLastError() << std::endl;
+
+    return (false);
 }
 
 void Sniffer::DeInitialize()
 {
     if (!this->Initialized)
         return;
+
     this->Sniffing = false;
     this->Stop();
-    delete[] this->Buffer;
+    delete[] this->data;
     this->SourceIP.clear();
     this->DestinationIP.clear();
     this->Interface = -1;
-    this->BuffSize = -1;
+    this->data_size = -1;
     this->Filter = false;
     this->SniffSource = false;
     this->SniffDestination = false;
@@ -68,69 +64,69 @@ bool Sniffer::Initialize()
         return true;
     WSADATA WSA;
     if (WSAStartup(MAKEWORD(2, 2), &WSA) != 0)
-    {
-        this->Error();
-        return false;
-    }
+        return (ManageError("Initialize socket"));
     this->SniffSocket = socket(AF_INET, SOCK_RAW, IPPROTO_IP);
     if (this->SniffSocket == INVALID_SOCKET)
-    {
-        this->Error();
-        return false;
-    }
+        return (ManageError("Invalid socket"));
     char HostName[64];
     if (gethostname(HostName, sizeof(HostName)) == SOCKET_ERROR)
-    {
-        this->Error();
-        return false;
-    }
+        return (ManageError("Get host name error"));
     struct hostent *LocalHost;
     LocalHost = gethostbyname(HostName);
     if (LocalHost == nullptr)
-    {
-        this->Error();
-        return false;
-    }
+        return (ManageError("Localhost gethostbyname"));
     memset(&this->Destination, 0, sizeof(this->Destination));
     memcpy(&this->Destination.sin_addr.s_addr, LocalHost->h_addr_list[this->Interface], sizeof(this->Destination.sin_addr.s_addr));
     this->Destination.sin_family = AF_INET;
     this->Destination.sin_port = 0;
     if (bind(this->SniffSocket, reinterpret_cast<SOCKADDR*>(&this->Destination), sizeof(this->Destination)) == SOCKET_ERROR)
-    {
-        this->Error();
-        return false;
-    }
+        return (ManageError("Bind socket"));
     int Buff = 1;
     if (WSAIoctl(this->SniffSocket, _WSAIOW(IOC_VENDOR, 1), &Buff, sizeof(Buff), 0, 0, reinterpret_cast<LPDWORD>(&this->Interface), 0,0) == SOCKET_ERROR)
-    {
-        this->Error();
-        return false;
-    }
-    this->Buffer = new char[1024 * 1024];
-    memset(Buffer, 0, 1024 * 1024);
+        return (ManageError("Setting interface socket"));
+    this->data = new char[1024 * 1024];
+    memset(data, 0, 1024 * 1024);
     this->Initialized = true;
     return true;
-}
-
-void Sniffer::Start()
-{
-    this->Sniffing = true;
-    this->Sniff();
-}
-
-void Sniffer::Stop()
-{
-    this->Sniffing = false;
 }
 
 void Sniffer::Sniff()
 {
     while (this->Sniffing)
     {
-        this->BuffSize = recvfrom(this->SniffSocket, this->Buffer, 1024 * 1024, 0, 0, 0);
-        if (this->BuffSize > 0)
-            this->Packet();
+        this->data_size = recvfrom(this->SniffSocket, this->data, 1024 * 1024, 0, 0, 0);
+        this->ManagePacket();
     }
+}
+
+void Sniffer::ManagePacket()
+{
+    this->iphdr = (IPV4_HDR*)this->data;
+    memset(&this->Source, 0, sizeof(this->Source));
+    this->Source.sin_addr.s_addr = this->iphdr->ip_srcaddr;
+    memset(&this->Destination, 0, sizeof(this->Destination));
+    this->Destination.sin_addr.s_addr = this->iphdr->ip_destaddr;
+    mutex.lock();
+    SniffedPacket *p = new SniffedPacket();
+    Packets.push_back(p);
+    p->ip_source = inet_ntoa(this->Source.sin_addr);
+    p->ip_dest = inet_ntoa(this->Destination.sin_addr);
+    p->size = this->data_size;
+
+    switch (this->iphdr->ip_protocol)
+    {
+        case ICMP:
+            this->ICMPPacket(*p);
+            break;
+        case TCP:
+            this->TCPPacket(*p);
+            break;
+        case UDP:
+            this->UDPPacket(*p);
+            break;
+    }
+
+    mutex.unlock();
 }
 
 std::string Sniffer::GetIP(std::string Address)
@@ -155,10 +151,15 @@ int Sniffer::GetInterface()
     return this->Interface;
 }
 
-void Sniffer::HandleTCP()
+void Sniffer::TCPPacket(SniffedPacket &packet)
 {
-    unsigned short IPHDR_LENGTH = this->iphdr->ip_header_len * 4;
-    this->tcphdr = (TCP_HDR*)(this->Buffer + IPHDR_LENGTH);
+    packet.protocol = "TCP";
+
+    unsigned short iphdr_size = this->iphdr->ip_header_len * 4;
+    this->tcphdr = (TCP_HDR *)(this->data + iphdr_size);
+
+    packet.info = QString::number(this->tcphdr->source_port) + " > " + QString::number(this->udphdr->dest_port);
+
     /*
     std::fstream File("OutputLog.txt", std::ios::out | std::ios::app);
 
@@ -181,54 +182,27 @@ void Sniffer::HandleTCP()
 */
 }
 
-void Sniffer::HandleICMP()
+void Sniffer::ICMPPacket(SniffedPacket &packet)
 {
-    unsigned short IPHDR_LENGTH = this->iphdr->ip_header_len * 4;
-    this->icmphdr = (ICMP_HDR*)(this->Buffer + IPHDR_LENGTH);
+    packet.protocol = "ICMP";
+
+    unsigned short iphdr_size = this->iphdr->ip_header_len * 4;
+    this->icmphdr = (ICMP_HDR *)(this->data + iphdr_size);
+
+    if (this->icmphdr->type == 0 && this->icmphdr->code == 0)
+        packet.info = "Echo (ping) reply";
+    else if (this->icmphdr->type == 8 && this->icmphdr->code == 0)
+        packet.info = "Echo (ping) request";
 }
 
-void Sniffer::HandleUDP()
+void Sniffer::UDPPacket(SniffedPacket &packet)
 {
-    unsigned short IPHDR_LENGTH = this->iphdr->ip_header_len * 4;
-    this->udphdr = (UDP_HDR*)(this->Buffer + IPHDR_LENGTH);
-}
+    packet.protocol = "UDP";
 
-void Sniffer::Packet()
-{
-    this->iphdr = (IPV4_HDR*)this->Buffer;
-    memset(&this->Source, 0, sizeof(this->Source));
-    this->Source.sin_addr.s_addr = this->iphdr->ip_srcaddr;
-    memset(&this->Destination, 0, sizeof(this->Destination));
-    this->Destination.sin_addr.s_addr = this->iphdr->ip_destaddr;
-    mutex.lock();
-    SniffedPacket *p = new SniffedPacket();
-    Packets.push_back(p);
-    p->ip_source = inet_ntoa(this->Source.sin_addr);
-    p->ip_dest = inet_ntoa(this->Destination.sin_addr);
-    mutex.unlock();
+    unsigned short iphdr_size = this->iphdr->ip_header_len * 4;
+    this->udphdr = (UDP_HDR *)(this->data + iphdr_size);
 
-    return ;
-
-    std::cout << "Source : " << inet_ntoa(this->Source.sin_addr);
-    std::cout << " Destination : " << inet_ntoa(this->Destination.sin_addr);
-    std::cout << std::endl;
-    switch (this->iphdr->ip_protocol)
-    {
-        case ICMP:
-            this->HandleICMP();
-            std::cout << "ICMP\n";
-            break;
-        case TCP:
-            this->HandleTCP();
-            std::cout << "TCP\n";
-            break;
-        case UDP:
-            this->HandleUDP();
-            std::cout << "UDP\n";
-            break;
-        default:
-            break;
-    }
+    packet.info = "Source port: " + QString::number(this->udphdr->source_port) + "    Destination port: " + QString::number(this->udphdr->dest_port);
 }
 
 std::string Sniffer::PrintBuffer(char* data, int s)

@@ -18,6 +18,8 @@ public:
     ~MainWindow();
 
 private:
+    void    insertToIndex(const QString &str, int row, int col);
+
     QThread *thread;
     Sniffer *sniffer;
     Ui::MainWindow *ui;
