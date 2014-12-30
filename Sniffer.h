@@ -1,8 +1,24 @@
 #ifndef SNIFFER_H_INCLUDED
 #define SNIFFER_H_INCLUDED
 
+#ifdef __linux__
+#include <arpa/inet.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <unistd.h>
+#include <netdb.h>
+#include <linux/if_ether.h>
+#include <net/if.h>
+#include <sys/ioctl.h>
+#include <netpacket/packet.h>
+#include <net/ethernet.h>
+
+#elif _WIN32
 #include <WinSock2.h>
 #include <windows.h>
+#endif
+
 #include <string>
 #include <stdexcept>
 #include <algorithm>
@@ -13,10 +29,28 @@
 #include <cstdint>
 #include <QtDebug>
 #include <QObject>
+#include <QMutex>
 
 #define ICMP 1
 #define TCP 6
 #define UDP 17
+
+#ifdef __linux__
+#define SOCKET int
+#define INVALID_SOCKET -1
+#define SOCKET_ERROR   -1
+typedef char WCHAR;
+typedef char CHAR;
+typedef WCHAR *LPWSTR;
+typedef CHAR *LPSTR;
+#ifdef UNICODE
+ typedef LPWSTR LPTSTR;
+#else
+ typedef LPSTR LPTSTR;
+#endif
+
+#endif
+
 
 typedef struct ip_hdr
 {
@@ -61,12 +95,25 @@ typedef struct tcp_hdr
 
 typedef struct icmp_hdr
 {
-    BYTE type;
-    BYTE code;
-    USHORT checksum;
-    USHORT id;
-    USHORT seq;
+  uint8_t type;                /* message type */
+  uint8_t code;                /* type sub-code */
+  uint16_t checksum;
+  union
+  {
+    struct
+    {
+      uint16_t id;
+      uint16_t sequence;
+    } echo;                     /* echo datagram */
+    uint32_t   gateway;        /* gateway address */
+    struct
+    {
+      uint16_t __unused;
+      uint16_t mtu;
+    } frag;                     /* path mtu discovery */
+  } un;
 } ICMP_HDR;
+
 
 typedef struct udp_hdr
 {

@@ -7,8 +7,11 @@
 
 
 QT       += core gui
-LIBS    += -lws2_32
+
 DEFINES += WIN32_LEAN_AND_MEAN
+
+unix:QMAKE_CXXFLAGS += -std=c++11
+win32:LIBS += -lws2_32
 
 greaterThan(QT_MAJOR_VERSION, 4): QT += widgets
 
