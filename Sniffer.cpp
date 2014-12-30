@@ -4,9 +4,6 @@ Sniffer::Sniffer()
 {
     this->Initialized = false;
     this->Sniffing = false;
-    this->Filter = false;
-    this->SniffSource = false;
-    this->SniffDestination = false;
     this->Interface = 0;
 }
 
@@ -45,13 +42,8 @@ void Sniffer::DeInitialize()
     this->Sniffing = false;
     this->Stop();
     delete[] this->data;
-    this->SourceIP.clear();
-    this->DestinationIP.clear();
     this->Interface = -1;
     this->data_size = -1;
-    this->Filter = false;
-    this->SniffSource = false;
-    this->SniffDestination = false;
     this->iphdr = nullptr;
     this->tcphdr = nullptr;
     this->icmphdr = nullptr;
@@ -95,12 +87,12 @@ bool Sniffer::Initialize()
     struct sockaddr_ll sll;
     struct ifreq ifr;
 
-    memset( &sll, 0, sizeof( sll));
-    memset( &ifr, 0, sizeof( ifr));
+    memset(&sll, 0, sizeof(sll));
+    memset(&ifr, 0, sizeof(ifr));
 
-    strcpy( ifr.ifr_name, "wlan0");
+    strcpy(ifr.ifr_name, "wlan0");
 
-    if(( ioctl( this->SniffSocket, SIOCGIFINDEX, &ifr))==-1)
+    if((ioctl( this->SniffSocket, SIOCGIFINDEX, &ifr)) == -1)
     {
        printf( "error\n");
        return(-1);
@@ -143,23 +135,19 @@ void Sniffer::Sniff()
 
 void Sniffer::ManagePacket()
 {
-    this->iphdr = (IPV4_HDR*)this->data;
+    this->iphdr = (IP_HDR *) this->data;
 
 #ifdef __linux__
-    this->iphdr += sizeof(struct ether_header);
+    this->iphdr = (IP_HDR *) (this->data + sizeof(struct ether_header));
 #endif
 
-    memset(&this->Source, 0, sizeof(this->Source));
-    this->Source.sin_addr.s_addr = this->iphdr->ip_srcaddr;
-    memset(&this->Destination, 0, sizeof(this->Destination));
-    this->Destination.sin_addr.s_addr = this->iphdr->ip_destaddr;
-    mutex.lock();
+    // Set data packet
     SniffedPacket *p = new SniffedPacket();
-    Packets.push_back(p);
-    p->ip_source = inet_ntoa(this->Source.sin_addr);
-    p->ip_dest = inet_ntoa(this->Destination.sin_addr);
+    p->ip_source = inet_ntoa(*((in_addr *) &this->iphdr->ip_srcaddr));
+    p->ip_dest = inet_ntoa(*((in_addr *) &this->iphdr->ip_destaddr));
     p->size = this->data_size;
 
+    // Specific info packet
     switch (this->iphdr->ip_protocol)
     {
         case ICMP:
@@ -171,8 +159,14 @@ void Sniffer::ManagePacket()
         case UDP:
             this->UDPPacket(*p);
             break;
+        default:
+            p->protocol = QString::number(this->iphdr->ip_protocol);
+            break;
     }
 
+    // Transmitting packet
+    mutex.lock();
+    Packets.push_back(p);
     mutex.unlock();
 }
 

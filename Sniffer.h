@@ -34,6 +34,15 @@
 #define ICMP 1
 #define TCP 6
 #define UDP 17
+#define IGMP 2
+#define SSCOPMCE 128
+#define SRP 119
+#define MFE-NSP 31
+#define CHAOS 16
+#define HOPOPT 0
+#define XNS-IDP 22
+#define IPX-in-IP 111
+#define PIM 103
 
 #ifdef __linux__
 #define SOCKET int
@@ -69,7 +78,7 @@ typedef struct ip_hdr
     unsigned short ip_checksum;
     unsigned int ip_srcaddr;
     unsigned int ip_destaddr;
-} IPV4_HDR;
+} IP_HDR;
 
 typedef struct tcp_hdr
 {
@@ -140,6 +149,7 @@ class Sniffer : public QObject
     public:
         Sniffer();
         ~Sniffer();
+
         int         GetInterface();
         void        SetInterface(int Interf);
         bool        Initialize();
@@ -161,8 +171,6 @@ public slots:
         // Socket
         SOCKET              SniffSocket;
         int                 Interface;
-        std::vector<std::string> SourceIP;
-        std::vector<std::string> DestinationIP;
         bool                Initialized;
         bool                Sniffing;
         struct sockaddr_in  Source, Destination;
@@ -178,10 +186,7 @@ public slots:
 
         // Current packet info
         int         data_size;
-        bool        Filter;
-        bool        SniffSource;
-        bool        SniffDestination;
-        IPV4_HDR    *iphdr;
+        IP_HDR    *iphdr;
         TCP_HDR     *tcphdr;
         ICMP_HDR    *icmphdr;
         UDP_HDR     *udphdr;
