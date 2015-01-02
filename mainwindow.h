@@ -25,6 +25,7 @@ private:
     Ui::MainWindow *ui;
 
 private slots:
+    void    ToggleSniffer();
     void    getNewPackets();
 };
 

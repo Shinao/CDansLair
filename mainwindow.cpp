@@ -1,6 +1,7 @@
 #include "mainwindow.h"
 #include "ui_mainwindow.h"
 #include "Sniffer.h"
+#include "dialoginterface.h"
 
 MainWindow::MainWindow(QWidget *parent) :
     QMainWindow(parent),
@@ -20,6 +21,8 @@ MainWindow::MainWindow(QWidget *parent) :
     connect(thread, SIGNAL(started()), sniffer, SLOT(Start()));
     thread->start();
     connect(timer, SIGNAL(timeout()), this, SLOT(getNewPackets()));
+
+    connect(ui->pb_sniff, SIGNAL(clicked()), this, SLOT(ToggleSniffer()));
 }
 
 MainWindow::~MainWindow()
@@ -57,4 +60,22 @@ void    MainWindow::insertToIndex(const QString &str, int row, int col)
     if (col != 4)
         item->setTextAlignment(Qt::AlignCenter);
     ui->tableWidget->setItem(row, col, item);
+}
+
+void                MainWindow::ToggleSniffer()
+{
+    if (this->sniffer->IsSniffing())
+    {
+        this->sniffer->Stop();
+        thread->terminate();
+        thread->wait();
+        this->sniffer->DeInitialize();
+        return ;
+    }
+
+    sniffer->Initialize("192.168.0.12");
+    thread->start();
+
+    //DialogInterface win;
+    //win.exec();
 }

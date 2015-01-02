@@ -21,9 +21,12 @@ TEMPLATE = app
 
 SOURCES += main.cpp\
         mainwindow.cpp \
-    Sniffer.cpp
+    Sniffer.cpp \
+    dialoginterface.cpp
 
 HEADERS  += mainwindow.h \
-    Sniffer.h
+    Sniffer.h \
+    dialoginterface.h
 
-FORMS    += mainwindow.ui
+FORMS    += mainwindow.ui \
+    dialoginterface.ui

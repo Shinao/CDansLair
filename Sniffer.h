@@ -17,6 +17,10 @@
 #elif _WIN32
 #include <WinSock2.h>
 #include <windows.h>
+#include <iphlpapi.h>
+#include <ws2tcpip.h>
+
+#pragma comment(lib, "iphlpapi.lib")
 #endif
 
 #include <string>
@@ -150,6 +154,7 @@ class Sniffer : public QObject
         Sniffer();
         ~Sniffer();
 
+        bool                    IsSniffing();
         bool                    Initialize(const std::string &interface);
         void                    DeInitialize();
         const std::string &     GetInterface();
@@ -164,7 +169,7 @@ class Sniffer : public QObject
         QMutex                     mutex;
 
 public slots:
-        void Start();
+        void                Start();
 
     private:
         // Socket

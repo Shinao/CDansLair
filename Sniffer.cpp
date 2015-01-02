@@ -1,13 +1,5 @@
 #include "Sniffer.h"
 
-#include <windows.h>
-#include <iphlpapi.h>
-#include <stdio.h>
-#include <ws2tcpip.h>
-#include <iostream>
-
-#pragma comment(lib, "iphlpapi.lib")
-
 Sniffer::Sniffer()
 {
     PIP_ADAPTER_INFO pAdapterInfo;
@@ -80,20 +72,17 @@ bool    Sniffer::ManageError(const std::string &msg)
     return (false);
 }
 
+bool Sniffer::IsSniffing()
+{
+    return this->Sniffing;
+}
+
 void Sniffer::DeInitialize()
 {
-    if (!this->Initialized)
+    if (!this->Initialized || this->Sniffing)
         return;
 
-    this->Sniffing = false;
-    this->Stop();
-    delete[] this->data;
-    this->Interface = -1;
-    this->data_size = -1;
-    this->iphdr = nullptr;
-    this->tcphdr = nullptr;
-    this->icmphdr = nullptr;
-    this->udphdr = nullptr;
+    this->Initialized = false;
 
 #ifdef __linux__
     close(this->SniffSocket);
