@@ -37,11 +37,11 @@
 #define IGMP 2
 #define SSCOPMCE 128
 #define SRP 119
-#define MFE-NSP 31
+#define MFENSP 31
 #define CHAOS 16
 #define HOPOPT 0
-#define XNS-IDP 22
-#define IPX-in-IP 111
+#define XNSIDP 22
+#define IPXinIP 111
 #define PIM 103
 
 #ifdef __linux__
@@ -150,15 +150,14 @@ class Sniffer : public QObject
         Sniffer();
         ~Sniffer();
 
-        int         GetInterface();
-        void        SetInterface(int Interf);
-        bool        Initialize();
-        void        DeInitialize();
+        bool                    Initialize(const std::string &interface);
+        void                    DeInitialize();
+        const std::string &     GetInterface();
 
         // Manipulation
-        void        Stop();
-        char        *data;
-        std::string GetIP(std::string Address);
+        void                    Stop();
+        char                    *data;
+        std::string             GetIP(std::string Address);
 
         // Thread
         std::list<SniffedPacket *> Packets;
@@ -170,7 +169,8 @@ public slots:
     private:
         // Socket
         SOCKET              SniffSocket;
-        int                 Interface;
+        std::string         Interface;
+        int                 InterfaceStatus;
         bool                Initialized;
         bool                Sniffing;
         struct sockaddr_in  Source, Destination;

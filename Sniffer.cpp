@@ -1,10 +1,56 @@
 #include "Sniffer.h"
 
+#include <windows.h>
+#include <iphlpapi.h>
+#include <stdio.h>
+#include <ws2tcpip.h>
+#include <iostream>
+
+#pragma comment(lib, "iphlpapi.lib")
+
 Sniffer::Sniffer()
 {
+    PIP_ADAPTER_INFO pAdapterInfo;
+      pAdapterInfo = (IP_ADAPTER_INFO *) malloc(sizeof(IP_ADAPTER_INFO));
+      ULONG buflen = sizeof(IP_ADAPTER_INFO);
+
+      if(GetAdaptersInfo(pAdapterInfo, &buflen) == ERROR_BUFFER_OVERFLOW) {
+        free(pAdapterInfo);
+        pAdapterInfo = (IP_ADAPTER_INFO *) malloc(buflen);
+      }
+
+      if(GetAdaptersInfo(pAdapterInfo, &buflen) == NO_ERROR) {
+        PIP_ADAPTER_INFO pAdapter = pAdapterInfo;
+        while (pAdapter) {
+          printf("\tAdapter Name: \t%s\n", pAdapter->AdapterName);
+          printf("\tAdapter Desc: \t%s\n", pAdapter->Description);
+          printf("\tAdapter Addr: \t%ld\n", pAdapter->Address);
+          printf("\tIP Address: \t%s\n", pAdapter->IpAddressList.IpAddress.String);
+          printf("\tIP Mask: \t%s\n", pAdapter->IpAddressList.IpMask.String);
+          printf("\tGateway: \t%s\n", pAdapter->GatewayList.IpAddress.String);
+          if(pAdapter->DhcpEnabled) {
+            printf("\tDHCP Enabled: Yes\n");
+            printf("\t\tDHCP Server: \t%s\n", pAdapter->DhcpServer.IpAddress.String);
+            printf("\tLease Obtained: %ld\n", pAdapter->LeaseObtained);
+          } else {
+            printf("\tDHCP Enabled: No\n");
+          }
+          if(pAdapter->HaveWins) {
+            printf("\tHave Wins: Yes\n");
+            printf("\t\tPrimary Wins Server: \t%s\n", pAdapter->PrimaryWinsServer.IpAddress.String);
+            printf("\t\tSecondary Wins Server: \t%s\n", pAdapter->SecondaryWinsServer.IpAddress.String);
+          } else {
+            printf("\tHave Wins: No\n");
+          }
+          pAdapter = pAdapter->Next;
+        }
+      } else {
+        printf("Call to GetAdaptersInfo failed.\n");
+      }
+
     this->Initialized = false;
     this->Sniffing = false;
-    this->Interface = 0;
+    this->InterfaceStatus = 0;
 }
 
 Sniffer::~Sniffer()
@@ -25,10 +71,10 @@ void Sniffer::Stop()
 
 bool    Sniffer::ManageError(const std::string &msg)
 {
-    std::cerr << "Error : " << msg << std::endl;
+    qDebug() << "Error : " << msg.c_str();
 
 #ifdef _WIN32
-    std::cerr << "Windows Error ID : " << WSAGetLastError() << std::endl;
+    qDebug() << "Windows Error ID : " << WSAGetLastError();
 #endif
 
     return (false);
@@ -59,10 +105,12 @@ void Sniffer::DeInitialize()
     this->Initialized = false;
 }
 
-bool Sniffer::Initialize()
+bool Sniffer::Initialize(const std::string &interface)
 {
     if (this->Initialized)
-        return true;
+        return false;
+
+    this->Interface = interface;
 
 #ifdef _WIN32
     WSADATA WSA;
@@ -75,6 +123,8 @@ bool Sniffer::Initialize()
 
     if (this->SniffSocket == INVALID_SOCKET)
         return (ManageError("Invalid socket"));
+
+    // TO REMOVE
     char HostName[64];
     if (gethostname(HostName, sizeof(HostName)) == SOCKET_ERROR)
         return (ManageError("Get host name error"));
@@ -93,31 +143,29 @@ bool Sniffer::Initialize()
     strcpy(ifr.ifr_name, "wlan0");
 
     if((ioctl( this->SniffSocket, SIOCGIFINDEX, &ifr)) == -1)
-    {
-       printf( "error\n");
-       return(-1);
-    }
+        return (ManageError("Set interface socket"));
     sll.sll_family = AF_PACKET;
     sll.sll_ifindex = ifr.ifr_ifindex;
     sll.sll_protocol = htons( ETH_P_ALL);
 
-     if (bind( this->SniffSocket, (struct sockaddr*)&sll, sizeof( sll)) == -1)
-       {
-         printf("error\n");
-       }
+    if (bind( this->SniffSocket, (struct sockaddr*)&sll, sizeof( sll)) == -1)
+      return (ManageError("Bind socket"));
 
  #elif _WIN32
     memset(&this->Destination, 0, sizeof(this->Destination));
-    memcpy(&this->Destination.sin_addr.s_addr, LocalHost->h_addr_list[this->Interface], sizeof(this->Destination.sin_addr.s_addr));
+    this->Destination.sin_addr.s_addr = inet_addr(this->Interface.c_str());
     this->Destination.sin_family = AF_INET;
     this->Destination.sin_port = 0;
+
     if (bind(this->SniffSocket, reinterpret_cast<SOCKADDR*>(&this->Destination), sizeof(this->Destination)) == SOCKET_ERROR)
         return (ManageError("Bind socket"));
+
     int Buff = 1;
-    if (WSAIoctl(this->SniffSocket, _WSAIOW(IOC_VENDOR, 1), &Buff, sizeof(Buff), 0, 0, reinterpret_cast<LPDWORD>(&this->Interface), 0,0) == SOCKET_ERROR)
+    if (WSAIoctl(this->SniffSocket, _WSAIOW(IOC_VENDOR, 1), &Buff, sizeof(Buff), 0, 0, reinterpret_cast<LPDWORD>(&this->InterfaceStatus), 0,0) == SOCKET_ERROR)
         return (ManageError("Setting interface socket"));
 #endif
 
+    // TO CHANGE
     this->data = new char[1024 * 1024];
     memset(data, 0, 1024 * 1024);
     this->Initialized = true;
@@ -129,7 +177,8 @@ void Sniffer::Sniff()
     while (this->Sniffing)
     {
         this->data_size = recvfrom(this->SniffSocket, this->data, 1024 * 1024, 0, 0, 0);
-        this->ManagePacket();
+        if (this->data_size > 0)
+            this->ManagePacket();
     }
 }
 
@@ -170,31 +219,7 @@ void Sniffer::ManagePacket()
     mutex.unlock();
 }
 
-std::string Sniffer::GetIP(std::string Address)
-{
-    if (!this->Initialized)
-        return std::string();
-    hostent* ResIP = gethostbyname(Address.c_str());
-    if (ResIP == nullptr)
-        return std::string();
-
-#ifdef _WIN32
-    IN_ADDR addr;
-    memcpy(&addr.S_un.S_addr, ResIP->h_addr, ResIP->h_length);
-#elif __linux__
-    in_addr addr;
-    memcpy(&addr.s_addr, ResIP->h_addr, ResIP->h_length);
-#endif
-
-    return inet_ntoa(addr);
-}
-
-void Sniffer::SetInterface(int Interf)
-{
-    this->Interface = Interf;
-}
-
-int Sniffer::GetInterface()
+const std::string &Sniffer::GetInterface()
 {
     return this->Interface;
 }

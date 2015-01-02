@@ -12,8 +12,7 @@ MainWindow::MainWindow(QWidget *parent) :
     thread = new QThread();
     sniffer = new Sniffer();
     sniffer->moveToThread(thread);
-    sniffer->SetInterface(0);
-    sniffer->Initialize();
+    sniffer->Initialize("192.168.0.12");
 
     QTimer *timer = new QTimer(this);
     timer->setInterval(100);
