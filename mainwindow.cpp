@@ -8,21 +8,21 @@ MainWindow::MainWindow(QWidget *parent) :
     ui(new Ui::MainWindow)
 {
     ui->setupUi(this);
+    ui->pb_scroll->setCheckable(true);
     ui->tableWidget->setSelectionBehavior(QAbstractItemView::SelectRows);
 
     thread = new QThread();
     sniffer = new Sniffer();
     sniffer->moveToThread(thread);
-    sniffer->Initialize("192.168.0.12");
 
     QTimer *timer = new QTimer(this);
     timer->setInterval(100);
     timer->start(100);
     connect(thread, SIGNAL(started()), sniffer, SLOT(Start()));
-    thread->start();
     connect(timer, SIGNAL(timeout()), this, SLOT(getNewPackets()));
 
     connect(ui->pb_sniff, SIGNAL(clicked()), this, SLOT(ToggleSniffer()));
+    connect(ui->pb_clear, SIGNAL(clicked()), this, SLOT(Clear()));
 }
 
 MainWindow::~MainWindow()
@@ -30,8 +30,22 @@ MainWindow::~MainWindow()
     delete ui;
 }
 
+void    MainWindow::Clear()
+{
+    sniffer->mutex.lock();
+    ui->tableWidget->clearContents();
+    ui->tableWidget->setRowCount(0);
+    for (std::list<SniffedPacket *>::iterator it = sniffer->Packets.begin(); it != sniffer->Packets.end(); it++)
+        delete *it;
+    sniffer->Packets.clear();
+    sniffer->mutex.unlock();
+}
+
 void    MainWindow::getNewPackets()
 {
+    if (!this->sniffer->IsSniffing())
+        return ;
+
     sniffer->mutex.lock();
 
     for (std::list<SniffedPacket *>::iterator it = sniffer->Packets.begin(); it != sniffer->Packets.end(); it++)
@@ -48,7 +62,8 @@ void    MainWindow::getNewPackets()
     }
 
     sniffer->Packets.clear();
-    //ui->tableWidget->scrollToBottom();
+    if (ui->pb_scroll->isChecked())
+        ui->tableWidget->scrollToBottom();
 
     sniffer->mutex.unlock();
 }
@@ -62,20 +77,29 @@ void    MainWindow::insertToIndex(const QString &str, int row, int col)
     ui->tableWidget->setItem(row, col, item);
 }
 
+void                MainWindow::StartSniffing(const std::string &interface)
+{
+    sniffer->Initialize(interface);
+    thread->start();
+    ui->pb_sniff->setText("STOP");
+}
+
 void                MainWindow::ToggleSniffer()
 {
     if (this->sniffer->IsSniffing())
     {
         this->sniffer->Stop();
-        thread->terminate();
-        thread->wait();
+        if (!thread->wait(500))
+        {
+            thread->terminate();
+            thread->wait();
+        }
         this->sniffer->DeInitialize();
+        ui->pb_sniff->setText("START");
+
         return ;
     }
 
-    sniffer->Initialize("192.168.0.12");
-    thread->start();
-
-    //DialogInterface win;
-    //win.exec();
+    DialogInterface win(this);
+    win.exec();
 }

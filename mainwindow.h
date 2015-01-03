@@ -17,6 +17,8 @@ public:
     explicit MainWindow(QWidget *parent = 0);
     ~MainWindow();
 
+    void    StartSniffing(const std::string &interface);
+
 private:
     void    insertToIndex(const QString &str, int row, int col);
 
@@ -27,6 +29,7 @@ private:
 private slots:
     void    ToggleSniffer();
     void    getNewPackets();
+    void    Clear();
 };
 
 #endif // MAINWINDOW_H

@@ -16,7 +16,11 @@ public:
     ~DialogInterface();
 
 private:
+    void    insertToIndex(const QString &str, int row, int col);
     Ui::DialogInterface *ui;
+
+private slots:
+    void    startSniffing();
 };
 
 #endif // DIALOGINTERFACE_H

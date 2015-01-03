@@ -2,44 +2,6 @@
 
 Sniffer::Sniffer()
 {
-    PIP_ADAPTER_INFO pAdapterInfo;
-      pAdapterInfo = (IP_ADAPTER_INFO *) malloc(sizeof(IP_ADAPTER_INFO));
-      ULONG buflen = sizeof(IP_ADAPTER_INFO);
-
-      if(GetAdaptersInfo(pAdapterInfo, &buflen) == ERROR_BUFFER_OVERFLOW) {
-        free(pAdapterInfo);
-        pAdapterInfo = (IP_ADAPTER_INFO *) malloc(buflen);
-      }
-
-      if(GetAdaptersInfo(pAdapterInfo, &buflen) == NO_ERROR) {
-        PIP_ADAPTER_INFO pAdapter = pAdapterInfo;
-        while (pAdapter) {
-          printf("\tAdapter Name: \t%s\n", pAdapter->AdapterName);
-          printf("\tAdapter Desc: \t%s\n", pAdapter->Description);
-          printf("\tAdapter Addr: \t%ld\n", pAdapter->Address);
-          printf("\tIP Address: \t%s\n", pAdapter->IpAddressList.IpAddress.String);
-          printf("\tIP Mask: \t%s\n", pAdapter->IpAddressList.IpMask.String);
-          printf("\tGateway: \t%s\n", pAdapter->GatewayList.IpAddress.String);
-          if(pAdapter->DhcpEnabled) {
-            printf("\tDHCP Enabled: Yes\n");
-            printf("\t\tDHCP Server: \t%s\n", pAdapter->DhcpServer.IpAddress.String);
-            printf("\tLease Obtained: %ld\n", pAdapter->LeaseObtained);
-          } else {
-            printf("\tDHCP Enabled: No\n");
-          }
-          if(pAdapter->HaveWins) {
-            printf("\tHave Wins: Yes\n");
-            printf("\t\tPrimary Wins Server: \t%s\n", pAdapter->PrimaryWinsServer.IpAddress.String);
-            printf("\t\tSecondary Wins Server: \t%s\n", pAdapter->SecondaryWinsServer.IpAddress.String);
-          } else {
-            printf("\tHave Wins: No\n");
-          }
-          pAdapter = pAdapter->Next;
-        }
-      } else {
-        printf("Call to GetAdaptersInfo failed.\n");
-      }
-
     this->Initialized = false;
     this->Sniffing = false;
     this->InterfaceStatus = 0;
@@ -153,6 +115,12 @@ bool Sniffer::Initialize(const std::string &interface)
     if (WSAIoctl(this->SniffSocket, _WSAIOW(IOC_VENDOR, 1), &Buff, sizeof(Buff), 0, 0, reinterpret_cast<LPDWORD>(&this->InterfaceStatus), 0,0) == SOCKET_ERROR)
         return (ManageError("Setting interface socket"));
 #endif
+
+    // Timeout recvfrom
+    struct timeval tv;
+    tv.tv_sec = 1;
+    tv.tv_usec = 0;
+    setsockopt(this->SniffSocket, SOL_SOCKET, SO_RCVTIMEO, (char *) &tv, sizeof(struct timeval));
 
     // TO CHANGE
     this->data = new char[1024 * 1024];
