@@ -1,10 +1,31 @@
 #include "Sniffer.h"
 
+IP_HDR                      *Sniffer::iphdr;
+TCP_HDR                     *Sniffer::tcphdr;
+ICMP_HDR                    *Sniffer::icmphdr;
+UDP_HDR                     *Sniffer::udphdr;
+std::map<int, std::string>  Sniffer::ProtocolInfo;
+std::list<SniffedPacket *>  Sniffer::Packets;
+QMutex                      Sniffer::mutex;
+
 Sniffer::Sniffer()
 {
     this->Initialized = false;
     this->Sniffing = false;
     this->InterfaceStatus = 0;
+
+    ProtocolInfo[ICMP] = "ICMP";
+    ProtocolInfo[TCP] = "TCP";
+    ProtocolInfo[UDP] = "UDP";
+    ProtocolInfo[2] = "IGMP";
+    ProtocolInfo[128] = "SSCOPMCE";
+    ProtocolInfo[119] = "SRP";
+    ProtocolInfo[31] = "MFENSP";
+    ProtocolInfo[16] = "CHAOS";
+    ProtocolInfo[0] = "HOPOPT";
+    ProtocolInfo[22] = "XNSIDP";
+    ProtocolInfo[111] = "IPXinIP";
+    ProtocolInfo[103] = "PIM";
 }
 
 Sniffer::~Sniffer()
@@ -135,40 +156,40 @@ void Sniffer::Sniff()
     {
         this->data_size = recvfrom(this->SniffSocket, this->data, 1024 * 1024, 0, 0, 0);
         if (this->data_size > 0)
-            this->ManagePacket();
+            this->ManagePacket(this->data, this->data_size);
     }
 }
 
-void Sniffer::ManagePacket()
+void Sniffer::ManagePacket(char *data, int data_size, bool pcap)
 {
-    this->iphdr = (IP_HDR *) this->data;
+    Sniffer::iphdr = (IP_HDR *) data;
+    if (pcap)
+        Sniffer::iphdr = (IP_HDR *) ((char *) Sniffer::iphdr + ETHER_HDR_SIZE);
 
 #ifdef __linux__
-    this->iphdr = (IP_HDR *) (this->data + sizeof(struct ether_header));
+    Sniffer::iphdr = (IP_HDR *) (data + sizeof(struct ether_header));
 #endif
 
     // Set data packet
     SniffedPacket *p = new SniffedPacket();
-    p->ip_source = inet_ntoa(*((in_addr *) &this->iphdr->ip_srcaddr));
-    p->ip_dest = inet_ntoa(*((in_addr *) &this->iphdr->ip_destaddr));
-    p->size = this->data_size;
+    p->ip_source = inet_ntoa(*((in_addr *) &Sniffer::iphdr->ip_srcaddr));
+    p->ip_dest = inet_ntoa(*((in_addr *) &Sniffer::iphdr->ip_destaddr));
+    p->size = data_size;
+    p->data = data;
+
+    int protocol = Sniffer::iphdr->ip_protocol;
+    if (ProtocolInfo.find(protocol) != ProtocolInfo.end())
+        p->protocol = ProtocolInfo[protocol].c_str();
+    else
+        p->protocol = QString::number(protocol);
 
     // Specific info packet
-    switch (this->iphdr->ip_protocol)
-    {
-        case ICMP:
-            this->ICMPPacket(*p);
-            break;
-        case TCP:
-            this->TCPPacket(*p);
-            break;
-        case UDP:
-            this->UDPPacket(*p);
-            break;
-        default:
-            p->protocol = QString::number(this->iphdr->ip_protocol);
-            break;
-    }
+    if (protocol == ICMP)
+        Sniffer::ICMPPacket(*p);
+    else if (protocol == TCP)
+        Sniffer::TCPPacket(*p);
+    else if (protocol == UDP)
+        Sniffer::UDPPacket(*p);
 
     // Transmitting packet
     mutex.lock();
@@ -185,10 +206,10 @@ void Sniffer::TCPPacket(SniffedPacket &packet)
 {
     packet.protocol = "TCP";
 
-    unsigned short iphdr_size = this->iphdr->ip_header_len * 4;
-    this->tcphdr = (TCP_HDR *)(this->data + iphdr_size);
+    unsigned short iphdr_size = Sniffer::iphdr->ip_header_len * 4;
+    Sniffer::tcphdr = (TCP_HDR *)(packet.data + iphdr_size);
 
-    packet.info = QString::number(this->tcphdr->source_port) + " > " + QString::number(this->udphdr->dest_port);
+    packet.info = QString::number(Sniffer::tcphdr->source_port) + " > " + QString::number(Sniffer::tcphdr->dest_port);
 
     /*
     std::fstream File("OutputLog.txt", std::ios::out | std::ios::app);
@@ -216,12 +237,12 @@ void Sniffer::ICMPPacket(SniffedPacket &packet)
 {
     packet.protocol = "ICMP";
 
-    unsigned short iphdr_size = this->iphdr->ip_header_len * 4;
-    this->icmphdr = (ICMP_HDR *)(this->data + iphdr_size);
+    unsigned short iphdr_size = Sniffer::iphdr->ip_header_len * 4;
+    Sniffer::icmphdr = (ICMP_HDR *)(packet.data + iphdr_size);
 
-    if (this->icmphdr->type == 0 && this->icmphdr->code == 0)
+    if (Sniffer::icmphdr->type == 0 && Sniffer::icmphdr->code == 0)
         packet.info = "Echo (ping) reply";
-    else if (this->icmphdr->type == 8 && this->icmphdr->code == 0)
+    else if (Sniffer::icmphdr->type == 8 && Sniffer::icmphdr->code == 0)
         packet.info = "Echo (ping) request";
 }
 
@@ -229,10 +250,10 @@ void Sniffer::UDPPacket(SniffedPacket &packet)
 {
     packet.protocol = "UDP";
 
-    unsigned short iphdr_size = this->iphdr->ip_header_len * 4;
-    this->udphdr = (UDP_HDR *)(this->data + iphdr_size);
+    unsigned short iphdr_size = Sniffer::iphdr->ip_header_len * 4;
+    Sniffer::udphdr = (UDP_HDR *)(packet.data + iphdr_size);
 
-    packet.info = "Source port: " + QString::number(this->udphdr->source_port) + "    Destination port: " + QString::number(this->udphdr->dest_port);
+    packet.info = "Source port: " + QString::number(Sniffer::udphdr->source_port) + "    Destination port: " + QString::number(Sniffer::udphdr->dest_port);
 }
 
 std::string Sniffer::PrintBuffer(char* data, int s)

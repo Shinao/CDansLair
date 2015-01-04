@@ -34,19 +34,12 @@
 #include <QtDebug>
 #include <QObject>
 #include <QMutex>
+#include <map>
 
 #define ICMP 1
 #define TCP 6
 #define UDP 17
-#define IGMP 2
-#define SSCOPMCE 128
-#define SRP 119
-#define MFENSP 31
-#define CHAOS 16
-#define HOPOPT 0
-#define XNSIDP 22
-#define IPXinIP 111
-#define PIM 103
+#define ETHER_HDR_SIZE 14
 
 #ifdef __linux__
 #define SOCKET int
@@ -160,18 +153,19 @@ class Sniffer : public QObject
         const std::string &     GetInterface();
 
         // Manipulation
+        static void             ManagePacket(char *data, int data_size, bool pcap = false);
         void                    Stop();
         char                    *data;
         std::string             GetIP(std::string Address);
 
         // Thread
-        std::list<SniffedPacket *> Packets;
-        QMutex                     mutex;
+        static std::list<SniffedPacket *> Packets;
+        static QMutex                     mutex;
 
 public slots:
         void                Start();
 
-    private:
+    protected:
         // Socket
         SOCKET              SniffSocket;
         std::string         Interface;
@@ -182,19 +176,19 @@ public slots:
 
         // Handle packets
         void        Sniff();
-        void        ManagePacket();
-        void        ICMPPacket(SniffedPacket &packet);
-        void        TCPPacket(SniffedPacket &packet);
-        void        UDPPacket(SniffedPacket &packet);
         std::string PrintBuffer(char* data, int s);
         bool        ManageError(const std::string &msg);
+        static void        ICMPPacket(SniffedPacket &packet);
+        static void        TCPPacket(SniffedPacket &packet);
+        static void        UDPPacket(SniffedPacket &packet);
 
         // Current packet info
-        int         data_size;
-        IP_HDR    *iphdr;
-        TCP_HDR     *tcphdr;
-        ICMP_HDR    *icmphdr;
-        UDP_HDR     *udphdr;
+        int                 data_size;
+        static IP_HDR       *iphdr;
+        static TCP_HDR      *tcphdr;
+        static ICMP_HDR     *icmphdr;
+        static UDP_HDR      *udphdr;
+        static std::map<int, std::string>  ProtocolInfo;
 };
 
 #endif // SNIFFER_H_INCLUDED
