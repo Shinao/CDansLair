@@ -132,8 +132,8 @@ void                  MainWindow::Save()
 
         pcaprec_hdr_t hdrp;
         std::memset(&hdrp, 0, sizeof(hdrp));
-        char eth_hdr[ETHER_HDR_SIZE];
-        std::memset(eth_hdr, 0, ETHER_HDR_SIZE);
+        eth_hdr_t eth_hdr;
+        eth_hdr.ether_type = 8;
         for (std::list<SniffedPacket *>::iterator it = this->Packets.begin(); it != this->Packets.end(); it++)
         {
             hdrp.incl_len = (*it)->size;
@@ -143,7 +143,7 @@ void                  MainWindow::Save()
 
             file.write((char *) &hdrp, sizeof(hdrp));
             if (!(*it)->has_ether_hdr)
-                file.write(eth_hdr, ETHER_HDR_SIZE);
+                file.write((char *) &eth_hdr, ETHER_HDR_SIZE);
             file.write((*it)->data, (*it)->size);
         }
 

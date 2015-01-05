@@ -57,6 +57,11 @@ typedef CHAR *LPSTR;
 
 #endif
 
+typedef struct eth_hdr {
+    char ether_dhost[6]; /* Destination host address */
+    char ether_shost[6]; /* Source host address */
+    short ether_type; /* IP? ARP? RARP? etc */
+} eth_hdr_t;
 
 typedef struct ip_hdr
 {

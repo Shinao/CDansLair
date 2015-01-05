@@ -176,7 +176,6 @@ void Sniffer::ManagePacket(char *data, int data_size, bool pcap)
     p->has_ether_hdr = true;
 #endif
 
-
     if (!p->has_ether_hdr)
         Sniffer::iphdr = (IP_HDR *) pdata;
     else
