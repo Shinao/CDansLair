@@ -49,9 +49,6 @@ void    MainWindow::Clear()
 
 void    MainWindow::getNewPackets()
 {
-    //if (!this->sniffer->IsSniffing())
-      //  return ;
-
     sniffer->mutex.lock();
 
     for (std::list<SniffedPacket *>::iterator it = sniffer->Packets.begin(); it != sniffer->Packets.end(); it++)
@@ -116,13 +113,44 @@ void                MainWindow::ToggleSniffer()
 
 void                  MainWindow::Save()
 {
+    if (this->sniffer->IsSniffing())
+        ToggleSniffer();
 
+    QString           fileName = QFileDialog::getSaveFileName(this, tr("Save File"), "", tr("PCAP (*.pcap)"));
+
+    std::ofstream file;
+    file.open (fileName.toStdString());
+    if (file.is_open())
+    {
+        pcap_hdr_t	hdr;
+        std::memset(&hdr, 0, sizeof(pcap_hdr_t));
+        hdr.magic_number = 0x4d3cb2a1;
+        hdr.version_major = 2;
+        hdr.version_minor = 4;
+        file.write((char *) &hdr, sizeof(hdr));
+
+        pcaprec_hdr_t hdrp;
+        std::memset(&hdrp, 0, sizeof(pcaprec_hdr_t));
+        for (std::list<SniffedPacket *>::iterator it = this->Packets.begin(); it != this->Packets.end(); it++)
+        {
+            hdrp.incl_len = (unsigned) (*it)->size;
+            hdrp.orig_len = (unsigned) hdrp.incl_len;
+            file.write((char *) &hdrp, sizeof(hdrp));
+            file.write((*it)->data, hdrp.incl_len);
+        }
+
+        file.close();
+    }
+    else
+        qDebug() << "Unable to open file";
 }
 
 void                  MainWindow::Load()
 {
   if (this->sniffer->IsSniffing())
       ToggleSniffer();
+
+  Clear();
 
   QString           fileName = QFileDialog::getOpenFileName(this, tr("Load File"), "", tr("PCAP (*.pcap)"));
   std::streampos    size;
@@ -147,6 +175,7 @@ void                  MainWindow::Load()
     char *cursor = memblock + sizeof(pcap_hdr_t);
     pcaprec_hdr_t *hdrp;
 
+    int i = 0;
     while ((int) (cursor - memblock) < size)
     {
       hdrp = (pcaprec_hdr_t *) cursor;
@@ -156,6 +185,7 @@ void                  MainWindow::Load()
 
       Sniffer::ManagePacket(data, hdrp->incl_len, true);
       cursor += hdrp->incl_len;
+    ++i;
     }
 
     delete[] memblock;

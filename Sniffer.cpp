@@ -118,7 +118,7 @@ bool Sniffer::Initialize(const std::string &interface)
         return (ManageError("Set interface socket"));
     sll.sll_family = AF_PACKET;
     sll.sll_ifindex = ifr.ifr_ifindex;
-    sll.sll_protocol = htons( ETH_P_ALL);
+    sll.sll_protocol = htons(ETH_P_ALL);
 
     if (bind( this->SniffSocket, (struct sockaddr*)&sll, sizeof( sll)) == -1)
       return (ManageError("Bind socket"));
@@ -155,19 +155,26 @@ void Sniffer::Sniff()
     while (this->Sniffing)
     {
         this->data_size = recvfrom(this->SniffSocket, this->data, 1024 * 1024, 0, 0, 0);
-        if (this->data_size > 0)
-            this->ManagePacket(this->data, this->data_size);
+        this->ManagePacket(this->data, this->data_size);
     }
 }
 
 void Sniffer::ManagePacket(char *data, int data_size, bool pcap)
 {
+    if (data_size <= 0 || data_size > 65000)
+        return;
+
     Sniffer::iphdr = (IP_HDR *) data;
     if (pcap)
+    {
         Sniffer::iphdr = (IP_HDR *) ((char *) Sniffer::iphdr + ETHER_HDR_SIZE);
+        data_size -= ETHER_HDR_SIZE;
+    }
 
 #ifdef __linux__
     Sniffer::iphdr = (IP_HDR *) (data + sizeof(struct ether_header));
+    if (!pcap)
+        data_size -= ETHER_HDR_SIZE;
 #endif
 
     // Set data packet
@@ -175,7 +182,7 @@ void Sniffer::ManagePacket(char *data, int data_size, bool pcap)
     p->ip_source = inet_ntoa(*((in_addr *) &Sniffer::iphdr->ip_srcaddr));
     p->ip_dest = inet_ntoa(*((in_addr *) &Sniffer::iphdr->ip_destaddr));
     p->size = data_size;
-    p->data = data;
+    p->data = (char *) Sniffer::iphdr;
 
     int protocol = Sniffer::iphdr->ip_protocol;
     if (ProtocolInfo.find(protocol) != ProtocolInfo.end())
