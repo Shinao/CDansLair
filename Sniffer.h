@@ -137,6 +137,8 @@ struct SniffedPacket
     QString     info;
     QString     protocol;
     char        *data;
+    int         proto_id;
+    bool        has_ether_hdr;
 };
 
 class Sniffer : public QObject

@@ -143,9 +143,9 @@ bool Sniffer::Initialize(const std::string &interface)
     tv.tv_usec = 0;
     setsockopt(this->SniffSocket, SOL_SOCKET, SO_RCVTIMEO, (char *) &tv, sizeof(struct timeval));
 
-    // TO CHANGE
     this->data = new char[1024 * 1024];
     memset(data, 0, 1024 * 1024);
+
     this->Initialized = true;
     return true;
 }
@@ -164,25 +164,29 @@ void Sniffer::ManagePacket(char *data, int data_size, bool pcap)
     if (data_size <= 0 || data_size > 65000)
         return;
 
-    Sniffer::iphdr = (IP_HDR *) data;
+    SniffedPacket *p = new SniffedPacket();
+    p->has_ether_hdr = false;
+    char    *pdata = new char[data_size];
+    std::memcpy(pdata, data, data_size);
+
     if (pcap)
-    {
-        Sniffer::iphdr = (IP_HDR *) ((char *) Sniffer::iphdr + ETHER_HDR_SIZE);
-        data_size -= ETHER_HDR_SIZE;
-    }
+        p->has_ether_hdr = true;
 
 #ifdef __linux__
-    Sniffer::iphdr = (IP_HDR *) (data + sizeof(struct ether_header));
-    if (!pcap)
-        data_size -= ETHER_HDR_SIZE;
+    p->has_ether_hdr = true;
 #endif
 
+
+    if (!p->has_ether_hdr)
+        Sniffer::iphdr = (IP_HDR *) pdata;
+    else
+        Sniffer::iphdr = (IP_HDR *) (pdata + ETHER_HDR_SIZE);
+
     // Set data packet
-    SniffedPacket *p = new SniffedPacket();
     p->ip_source = inet_ntoa(*((in_addr *) &Sniffer::iphdr->ip_srcaddr));
     p->ip_dest = inet_ntoa(*((in_addr *) &Sniffer::iphdr->ip_destaddr));
     p->size = data_size;
-    p->data = (char *) Sniffer::iphdr;
+    p->data = pdata;
 
     int protocol = Sniffer::iphdr->ip_protocol;
     if (ProtocolInfo.find(protocol) != ProtocolInfo.end())

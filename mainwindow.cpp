@@ -118,25 +118,33 @@ void                  MainWindow::Save()
 
     QString           fileName = QFileDialog::getSaveFileName(this, tr("Save File"), "", tr("PCAP (*.pcap)"));
 
-    std::ofstream file;
-    file.open (fileName.toStdString());
+    std::ofstream file(fileName.toStdString(), std::ios::binary | std::ios::trunc | std::ios::out);
     if (file.is_open())
     {
         pcap_hdr_t	hdr;
-        std::memset(&hdr, 0, sizeof(pcap_hdr_t));
-        hdr.magic_number = 0x4d3cb2a1;
+        std::memset((char *) &hdr, 0, sizeof(hdr));
+        hdr.magic_number = 0xA1B2C3D4;
         hdr.version_major = 2;
         hdr.version_minor = 4;
+        hdr.snaplen = 65535;
+        hdr.network = 1;
         file.write((char *) &hdr, sizeof(hdr));
 
         pcaprec_hdr_t hdrp;
-        std::memset(&hdrp, 0, sizeof(pcaprec_hdr_t));
+        std::memset(&hdrp, 0, sizeof(hdrp));
+        char eth_hdr[ETHER_HDR_SIZE];
+        std::memset(eth_hdr, 0, ETHER_HDR_SIZE);
         for (std::list<SniffedPacket *>::iterator it = this->Packets.begin(); it != this->Packets.end(); it++)
         {
-            hdrp.incl_len = (unsigned) (*it)->size;
-            hdrp.orig_len = (unsigned) hdrp.incl_len;
+            hdrp.incl_len = (*it)->size;
+            if (!(*it)->has_ether_hdr)
+                hdrp.incl_len += ETHER_HDR_SIZE;
+            hdrp.orig_len = hdrp.incl_len;
+
             file.write((char *) &hdrp, sizeof(hdrp));
-            file.write((*it)->data, hdrp.incl_len);
+            if (!(*it)->has_ether_hdr)
+                file.write(eth_hdr, ETHER_HDR_SIZE);
+            file.write((*it)->data, (*it)->size);
         }
 
         file.close();
@@ -172,20 +180,25 @@ void                  MainWindow::Load()
         return ;
     }
 
-    char *cursor = memblock + sizeof(pcap_hdr_t);
+    qDebug() << hdr.magic_number;
+    qDebug() << hdr.sigfigs;
+    qDebug() << hdr.snaplen;
+    qDebug() << hdr.thiszone;
+
+    qDebug() << hdr.version_major << " - " << hdr.version_minor;
+
+    char *cursor = memblock + sizeof(hdr);
     pcaprec_hdr_t *hdrp;
 
-    int i = 0;
     while ((int) (cursor - memblock) < size)
     {
       hdrp = (pcaprec_hdr_t *) cursor;
 
-      cursor += sizeof(pcaprec_hdr_t);
+      cursor += sizeof(*hdrp);
       char  *data = cursor;
 
       Sniffer::ManagePacket(data, hdrp->incl_len, true);
       cursor += hdrp->incl_len;
-    ++i;
     }
 
     delete[] memblock;
