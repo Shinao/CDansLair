@@ -188,6 +188,17 @@ void Sniffer::ManagePacket(char *data, int data_size, bool pcap)
     p->size = data_size;
     p->data = pdata;
 
+    if (p->ip_source == "0.0.0.0")
+    {
+        QByteArray array = QByteArray(data, 6);
+        p->ip_source = QString(array.toHex()).toStdString();
+    }
+    if (p->ip_dest == "0.0.0.0")
+    {
+        QByteArray array = QByteArray(data + 6, 6);
+        p->ip_dest = QString(array.toHex()).toStdString();
+    }
+
     int protocol = Sniffer::iphdr->ip_protocol;
     if (ProtocolInfo.find(protocol) != ProtocolInfo.end())
         p->protocol = ProtocolInfo[protocol].c_str();

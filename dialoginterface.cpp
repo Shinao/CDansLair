@@ -75,8 +75,13 @@ void    DialogInterface::startSniffing()
 {
     QItemSelectionModel *select = ui->tableWidget->selectionModel();
 
+    int column = 1;
+#ifdef __linux__
+    column = 0;
+#endif
+
     if (select->hasSelection())
-        ((MainWindow *)this->parentWidget())->StartSniffing(ui->tableWidget->item(select->selectedRows().at(0).row(), 1)->text().toStdString());
+        ((MainWindow *)this->parentWidget())->StartSniffing(ui->tableWidget->item(select->selectedRows().at(0).row(), column)->text().toStdString());
 }
 
 void    DialogInterface::insertToIndex(const QString &str, int row, int col)

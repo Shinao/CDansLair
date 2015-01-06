@@ -15,6 +15,7 @@
 #include <net/ethernet.h>
 #include <linux/if_link.h>
 #include <ifaddrs.h>
+#include <netinet/if_ether.h>
 
 #elif _WIN32
 #include <WinSock2.h>
