@@ -341,12 +341,13 @@ void    MainWindow::checkArp(SniffedPacket &packet)
         return;
 
     // Image replace
+    std::string data(packet.data, packet.size);
     if (packet.protocol == "TCP" && packet.dport == 80)
     {
         std::string tofind("img src=");
         std::string toreplace("img src=\"http://upload.wikimedia.org/wikipedia/fr/f/fb/C-dans-l'air.png\"");
         std::size_t index;
-        std::string data(packet.data, packet.size);
+
 
         while ((index = data.find(tofind)) != std::string::npos)
         {
@@ -356,7 +357,7 @@ void    MainWindow::checkArp(SniffedPacket &packet)
     }
 
  #ifdef _WIN32
-    sendto(sd, packet.data, packet.size, 0, (struct sockaddr *)&sin, sizeof(sin));
+    sendto(sd, data.c_str(), packet.size, 0, (struct sockaddr *)&sin, sizeof(sin));
     closesocket(sd);
  #elif __linux__
     sendto(sd, packet.data + ETHER_HDR_SIZE, packet.size - ETHER_HDR_SIZE, 0, (struct sockaddr *)&sin, sizeof(sin));
