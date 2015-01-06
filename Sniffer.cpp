@@ -112,7 +112,7 @@ bool Sniffer::Initialize(const std::string &interface)
     memset(&sll, 0, sizeof(sll));
     memset(&ifr, 0, sizeof(ifr));
 
-    strcpy(ifr.ifr_name, "wlan0");
+    strcpy(ifr.ifr_name, interface.c_str());
 
     if((ioctl( this->SniffSocket, SIOCGIFINDEX, &ifr)) == -1)
         return (ManageError("Set interface socket"));
