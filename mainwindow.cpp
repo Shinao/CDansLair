@@ -198,18 +198,11 @@ void                  MainWindow::Load()
     file.close();
 
     pcap_hdr_t	&hdr = *(pcap_hdr_t *) memblock;
-    if (hdr.magic_number != 0xd4c3b2a1 && hdr.magic_number != 0xa1b2c3d4 && hdr.magic_number != 0xa1b23c4d && hdr.magic_number != 0x4d3cb2a1)
+    if (hdr.magic_number != 0xa1b2c3d4)
     {
-        qDebug () << "Wrong format";
+        qDebug() << "Wrong format";
         return ;
     }
-
-    qDebug() << hdr.magic_number;
-    qDebug() << hdr.sigfigs;
-    qDebug() << hdr.snaplen;
-    qDebug() << hdr.thiszone;
-
-    qDebug() << hdr.version_major << " - " << hdr.version_minor;
 
     char *cursor = memblock + sizeof(hdr);
     pcaprec_hdr_t *hdrp;
@@ -262,7 +255,6 @@ void                MainWindow::ArpPoisoning()
 
 void            MainWindow::refreshArp()
 {
-    qDebug() << "in";
 #ifdef __linux__
     if (client1 == NULL || client2 == NULL || !this->sniffer->IsSniffing())
         return;
@@ -306,15 +298,12 @@ void            MainWindow::refreshArp()
         memcpy(device.sll_addr, arp->arp_sha, ETH_ALEN);
         device.sll_halen = htons(ETH_ALEN);
 
-        qDebug() << sendto(sock, packet, PKTLEN, 0, (struct sockaddr *) &device, sizeof(device));
-        perror("eded : ");
-        qDebug() << this->interface.c_str();
+        sendto(sock, packet, PKTLEN, 0, (struct sockaddr *) &device, sizeof(device));
         client = client2;
     }
 
     ::close(sock);
 #endif
-    qDebug() << "out";
 }
 
 void    MainWindow::checkArp(SniffedPacket &packet)
@@ -324,7 +313,6 @@ void    MainWindow::checkArp(SniffedPacket &packet)
 
     QByteArray array = QByteArray(packet.data + 6, 6);
     QByteArray array2 = QByteArray(mac, 6);
-    qDebug() << QString(array.toHex()) << " = " << QString(array2.toHex());
 
     eth_hdr_t *eth = (eth_hdr_t *) packet.data;
     if (strncmp(eth->ether_dhost, mac, 6))
@@ -371,7 +359,7 @@ void    MainWindow::checkArp(SniffedPacket &packet)
     sendto(sd, packet.data, packet.size, 0, (struct sockaddr *)&sin, sizeof(sin));
     closesocket(sd);
  #elif __linux__
-    qDebug() << sendto(sd, packet.data + ETHER_HDR_SIZE, packet.size - ETHER_HDR_SIZE, 0, (struct sockaddr *)&sin, sizeof(sin));
+    sendto(sd, packet.data + ETHER_HDR_SIZE, packet.size - ETHER_HDR_SIZE, 0, (struct sockaddr *)&sin, sizeof(sin));
     ::close(sd);
  #endif
 }
