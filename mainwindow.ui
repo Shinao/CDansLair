@@ -98,6 +98,13 @@
        </spacer>
       </item>
       <item>
+       <widget class="QPushButton" name="pb_arp">
+        <property name="text">
+         <string>ARP Poisoning</string>
+        </property>
+       </widget>
+      </item>
+      <item>
        <widget class="QPushButton" name="pb_scroll">
         <property name="text">
          <string>Auto Scroll</string>

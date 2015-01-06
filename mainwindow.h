@@ -24,6 +24,11 @@ typedef struct pcaprec_hdr_s {
         unsigned orig_len;       /* actual length of packet */
 } pcaprec_hdr_t;
 
+typedef struct client_s {
+    std::string ip;
+    char        mac[6];
+}               client_t;
+
 namespace Ui {
 class MainWindow;
 }
@@ -41,11 +46,18 @@ public:
 private:
     void    insertPacket(SniffedPacket &packet);
     void    insertToIndex(const QString &str, int row, int col);
+    void    checkArp(SniffedPacket &packet);
+    void    refreshArp();
 
+    char                        mac[6];
     std::list<SniffedPacket *>  Packets;
     QThread                     *thread;
     Sniffer                     *sniffer;
     Ui::MainWindow              *ui;
+    client_t                    *client1;
+    client_t                    *client2;
+    std::string                 interface;
+    int                         counter;
 
 private slots:
     void    ToggleSniffer();
@@ -53,6 +65,7 @@ private slots:
     void    Clear();
     void    Save();
     void    Load();
+    void    ArpPoisoning();
 };
 
 #endif // MAINWINDOW_H

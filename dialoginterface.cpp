@@ -1,6 +1,7 @@
 #include "dialoginterface.h"
 #include "ui_dialoginterface.h"
 #include "mainwindow.h"
+#include "Sniffer.h"
 
 DialogInterface::DialogInterface(QWidget *parent) :
     QDialog(parent),
@@ -10,6 +11,7 @@ DialogInterface::DialogInterface(QWidget *parent) :
 
     connect(ui->buttonBox, SIGNAL(accepted()), this, SLOT(startSniffing()));
 
+#ifdef _WIN32
     PIP_ADAPTER_INFO pAdapterInfo;
       pAdapterInfo = (IP_ADAPTER_INFO *) malloc(sizeof(IP_ADAPTER_INFO));
       ULONG buflen = sizeof(IP_ADAPTER_INFO);
@@ -22,18 +24,51 @@ DialogInterface::DialogInterface(QWidget *parent) :
       if(GetAdaptersInfo(pAdapterInfo, &buflen) == NO_ERROR) {
         PIP_ADAPTER_INFO pAdapter = pAdapterInfo;
         while (pAdapter) {
-            int i = ui->tableWidget->rowCount();
-            ui->tableWidget->insertRow(i);
-
-            insertToIndex(pAdapter->Description, i, 0);
-            insertToIndex(pAdapter->IpAddressList.IpAddress.String, i, 1);
-            insertToIndex(pAdapter->GatewayList.IpAddress.String, i, 2);
+            insertInterface(pAdapter->Description, pAdapter->IpAddressList.IpAddress.String, pAdapter->GatewayList.IpAddress.String);
 
           pAdapter = pAdapter->Next;
         }
       } else {
         printf("Call to GetAdaptersInfo failed.\n");
       }
+#elif __linux__
+    struct ifaddrs *ifaddr, *ifa;
+    int family, s, n;
+    char host[NI_MAXHOST];
+
+    if (getifaddrs(&ifaddr) == -1) {
+      perror("getifaddrs");
+      return;
+    }
+
+    for (ifa = ifaddr, n = 0; ifa != NULL; ifa = ifa->ifa_next, n++) {
+      family = ifa->ifa_addr->sa_family;
+      if (ifa->ifa_addr == NULL || family != AF_INET)
+        continue;
+
+        s = getnameinfo(ifa->ifa_addr,
+                        (family == AF_INET) ? sizeof(struct sockaddr_in) :
+                        sizeof(struct sockaddr_in6),
+                        host, NI_MAXHOST,
+                        NULL, 0, NI_NUMERICHOST);
+
+        if (s != 0)
+            continue;
+        insertInterface(ifa->ifa_name, host, "");
+    }
+
+    freeifaddrs(ifaddr);
+#endif
+}
+
+void DialogInterface::insertInterface(const char *name, const char *ip, const char *gateway)
+{
+    int i = ui->tableWidget->rowCount();
+    ui->tableWidget->insertRow(i);
+
+    insertToIndex(name, i, 0);
+    insertToIndex(ip, i, 1);
+    insertToIndex(gateway, i, 2);
 }
 
 void    DialogInterface::startSniffing()

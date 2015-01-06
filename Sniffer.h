@@ -13,6 +13,8 @@
 #include <sys/ioctl.h>
 #include <netpacket/packet.h>
 #include <net/ethernet.h>
+#include <linux/if_link.h>
+#include <ifaddrs.h>
 
 #elif _WIN32
 #include <WinSock2.h>
@@ -35,11 +37,16 @@
 #include <QObject>
 #include <QMutex>
 #include <map>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
 
 #define ICMP 1
 #define TCP 6
 #define UDP 17
 #define ETHER_HDR_SIZE 14
+#define IP4LEN 4
+#define PKTLEN sizeof(struct ether_header) + sizeof(struct ether_arp)
 
 #ifdef __linux__
 #define SOCKET int
@@ -182,9 +189,8 @@ public slots:
         struct sockaddr_in  Source, Destination;
 
         // Handle packets
-        void        Sniff();
-        std::string PrintBuffer(char* data, int s);
-        bool        ManageError(const std::string &msg);
+        void                Sniff();
+        bool                ManageError(const std::string &msg);
         static void        ICMPPacket(SniffedPacket &packet);
         static void        TCPPacket(SniffedPacket &packet);
         static void        UDPPacket(SniffedPacket &packet);

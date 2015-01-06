@@ -17,6 +17,7 @@ public:
 
 private:
     void    insertToIndex(const QString &str, int row, int col);
+    void    insertInterface(const char *name, const char *ip, const char *gateway);
     Ui::DialogInterface *ui;
 
 private slots:
