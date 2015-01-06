@@ -152,6 +152,8 @@ struct SniffedPacket
     char        *data;
     int         proto_id;
     bool        has_ether_hdr;
+    int         sport;
+    int         dport;
 };
 
 class Sniffer : public QObject

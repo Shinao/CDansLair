@@ -232,7 +232,9 @@ void Sniffer::TCPPacket(SniffedPacket &packet)
     unsigned short iphdr_size = Sniffer::iphdr->ip_header_len * 4;
     Sniffer::tcphdr = (TCP_HDR *)((char *) Sniffer::iphdr +  iphdr_size);
 
-    packet.info = QString::number(ntohs(Sniffer::tcphdr->source_port)) + " > " + QString::number(ntohs(Sniffer::tcphdr->dest_port));
+    packet.sport = ntohs(Sniffer::tcphdr->source_port);
+    packet.dport = ntohs(Sniffer::tcphdr->dest_port);
+    packet.info = QString::number(packet.sport) + " > " + QString::number(packet.dport);
 
     /*
     std::fstream File("OutputLog.txt", std::ios::out | std::ios::app);

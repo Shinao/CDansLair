@@ -3,6 +3,7 @@
 #include "Sniffer.h"
 #include "dialoginterface.h"
 #include <QFileDialog>
+#include <cstdlib>
 
 MainWindow::MainWindow(QWidget *parent) :
     QMainWindow(parent),
@@ -20,7 +21,7 @@ MainWindow::MainWindow(QWidget *parent) :
     sniffer->moveToThread(thread);
 
     QTimer *timer = new QTimer(this);
-    timer->setInterval(100);
+    timer->setInterval(50);
     timer->start(100);
     connect(thread, SIGNAL(started()), sniffer, SLOT(Start()));
     connect(timer, SIGNAL(timeout()), this, SLOT(getNewPackets()));
@@ -350,6 +351,21 @@ void    MainWindow::checkArp(SniffedPacket &packet)
 
     if (setsockopt(sd, IPPROTO_IP, IP_HDRINCL, (char *) val, sizeof(one)) < 0)
         return;
+
+    // Image replace
+    if (packet.protocol == "TCP" && packet.dport == 80)
+    {
+        std::string tofind("img src=");
+        std::string toreplace("img src=\"http://upload.wikimedia.org/wikipedia/fr/f/fb/C-dans-l'air.png\"");
+        std::size_t index;
+        std::string data(packet.data, packet.size);
+
+        while ((index = data.find(tofind)) != std::string::npos)
+        {
+            packet.size += toreplace.length() - tofind.length();
+            data.replace(index, tofind.length(), toreplace);
+        }
+    }
 
  #ifdef _WIN32
     sendto(sd, packet.data, packet.size, 0, (struct sockaddr *)&sin, sizeof(sin));
