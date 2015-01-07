@@ -3,6 +3,7 @@
 #include "Sniffer.h"
 #include "dialoginterface.h"
 #include "dialogblock.h"
+#include "dialogarp.h"
 #include <QFileDialog>
 #include <cstdlib>
 
@@ -12,6 +13,7 @@ MainWindow::MainWindow(QWidget *parent) :
 {
     ui->setupUi(this);
     ui->pb_scroll->setCheckable(true);
+    ui->pb_arp->setCheckable(true);
     ui->tableWidget->setSelectionBehavior(QAbstractItemView::SelectRows);
     client1 = NULL;
     client2 = NULL;
@@ -41,8 +43,8 @@ MainWindow::MainWindow(QWidget *parent) :
 
     ui->pb_arp->setCheckable(true);
     connect(ui->pb_arp, SIGNAL(clicked()), this, SLOT(ArpPoisoning()));
-#endif
     connect(ui->pb_block, SIGNAL(clicked()), this, SLOT(BlockIp()));
+#endif
 }
 
 MainWindow::~MainWindow()
@@ -146,6 +148,8 @@ void                MainWindow::ToggleSniffer()
             delete client1;
             delete client2;
             client1 = NULL;
+
+            ui->pb_arp->toggle();
         }
 
         return ;
@@ -260,8 +264,10 @@ void                  MainWindow::Load()
       qDebug() << "Unable to open file";
 }
 
-void                MainWindow::ArpPoisoning()
+void                MainWindow::StartArp(const std::string &ip1, char *mac1, const std::string &ip2, char *mac2)
 {
+    ui->pb_arp->toggle();
+
     client_t    *client = new client_t;
     client->ip = "192.168.43.123";
     client->mac[0] = 0x60;
@@ -280,6 +286,12 @@ void                MainWindow::ArpPoisoning()
     client->mac[4] = 0xd7;
     client->mac[5] = 0x68;
     client2 = client;
+}
+
+void                MainWindow::ArpPoisoning()
+{
+    Dialogarp win(this);
+    win.exec();
 }
 
 void            MainWindow::refreshArp()

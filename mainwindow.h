@@ -44,6 +44,7 @@ public:
     void    StartSniffing(const std::string &interface);
     void    Block(const std::string &ip);
     void    Unblock(const std::string &ip);
+    void    StartArp(const std::string &ip1, char *mac1, const std::string &ip2, char *mac2);
     std::list<std::string>      _blocked_ip;
 
 private:
