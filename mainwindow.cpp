@@ -2,6 +2,7 @@
 #include "ui_mainwindow.h"
 #include "Sniffer.h"
 #include "dialoginterface.h"
+#include "dialogblock.h"
 #include <QFileDialog>
 #include <cstdlib>
 
@@ -38,8 +39,10 @@ MainWindow::MainWindow(QWidget *parent) :
     _socket_arp = socket(PF_INET, SOCK_RAW, IPPROTO_RAW);
     setsockopt(_socket_arp, IPPROTO_IP, IP_HDRINCL, (char *) val, sizeof(one));
 
+    ui->pb_arp->setCheckable(true);
     connect(ui->pb_arp, SIGNAL(clicked()), this, SLOT(ArpPoisoning()));
 #endif
+    connect(ui->pb_block, SIGNAL(clicked()), this, SLOT(BlockIp()));
 }
 
 MainWindow::~MainWindow()
@@ -192,6 +195,22 @@ void                  MainWindow::Save()
     }
     else
         qDebug() << "Unable to open file";
+}
+
+void                MainWindow::BlockIp()
+{
+    DialogBlock win(this);
+    win.exec();
+}
+
+void    MainWindow::Block(const std::string &ip)
+{
+    _blocked_ip.push_back(ip);
+}
+
+void    MainWindow::Unblock(const std::string &ip)
+{
+    _blocked_ip.remove(ip);
 }
 
 void                  MainWindow::Load()

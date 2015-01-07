@@ -42,6 +42,9 @@ public:
     ~MainWindow();
 
     void    StartSniffing(const std::string &interface);
+    void    Block(const std::string &ip);
+    void    Unblock(const std::string &ip);
+    std::list<std::string>      _blocked_ip;
 
 private:
     void    insertPacket(SniffedPacket &packet);
@@ -68,6 +71,7 @@ private slots:
     void    Save();
     void    Load();
     void    ArpPoisoning();
+    void    BlockIp();
 };
 
 #endif // MAINWINDOW_H

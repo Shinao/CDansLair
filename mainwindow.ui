@@ -105,11 +105,24 @@
        </widget>
       </item>
       <item>
-       <widget class="QPushButton" name="pb_scroll">
+       <widget class="QPushButton" name="pb_block">
         <property name="text">
-         <string>Auto Scroll</string>
+         <string>Block IP</string>
         </property>
        </widget>
+      </item>
+      <item>
+       <spacer name="horizontalSpacer_2">
+        <property name="orientation">
+         <enum>Qt::Horizontal</enum>
+        </property>
+        <property name="sizeHint" stdset="0">
+         <size>
+          <width>40</width>
+          <height>20</height>
+         </size>
+        </property>
+       </spacer>
       </item>
       <item>
        <widget class="QPushButton" name="pb_load">
@@ -122,6 +135,13 @@
        <widget class="QPushButton" name="pb_save">
         <property name="text">
          <string>Save</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QPushButton" name="pb_scroll">
+        <property name="text">
+         <string>Auto Scroll</string>
         </property>
        </widget>
       </item>
