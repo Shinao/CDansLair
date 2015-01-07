@@ -251,6 +251,8 @@ void                MainWindow::ArpPoisoning()
     client->mac[4] = 0xd7;
     client->mac[5] = 0x68;
     client2 = client;
+
+    ip = "192.168.43.32";
 }
 
 void            MainWindow::refreshArp()
@@ -318,9 +320,11 @@ void    MainWindow::checkArp(SniffedPacket &packet)
     if (strncmp(eth->ether_dhost, mac, 6))
         return;
 
-    if (!(client1->ip == packet.ip_source && client2->ip == packet.ip_dest) &&
-            !(client2->ip == packet.ip_source && client1->ip == packet.ip_dest))
-        return;
+    if (packet.ip_dest == ip || packet.ip_source == ip || !(strncmp(eth->ether_shost, client1->mac) || strncmp(eth->ether_shost, client2->mac)))
+        return ;
+//    if (!(client1->ip == packet.ip_source && client2->ip == packet.ip_dest) &&
+//            !(client2->ip == packet.ip_source && client1->ip == packet.ip_dest))
+//        return;
 
     int                  sd;
     struct sockaddr_in   sin;

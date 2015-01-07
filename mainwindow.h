@@ -50,6 +50,7 @@ private:
     void    refreshArp();
 
     char                        mac[6];
+    std::string                 ip;
     std::list<SniffedPacket *>  Packets;
     QThread                     *thread;
     Sniffer                     *sniffer;
