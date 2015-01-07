@@ -234,7 +234,8 @@ void Sniffer::TCPPacket(SniffedPacket &packet)
 
     packet.sport = ntohs(Sniffer::tcphdr->source_port);
     packet.dport = ntohs(Sniffer::tcphdr->dest_port);
-    packet.info = QString::number(packet.sport) + " > " + QString::number(packet.dport);
+    packet.info = "Source port: " + QString::number(ntohs(Sniffer::tcphdr->source_port)) + "    Destination port: " + QString::number(ntohs(Sniffer::tcphdr->dest_port))
+            + "   Acknowledge: " +  QString::number(ntohs(Sniffer::tcphdr->acknowledge)) + "     Checksum: " + QString::number(ntohs(Sniffer::tcphdr->checksum));
 
     /*
     std::fstream File("OutputLog.txt", std::ios::out | std::ios::app);

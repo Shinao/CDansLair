@@ -45,12 +45,12 @@ public:
 
 private:
     void    insertPacket(SniffedPacket &packet);
-    void    insertToIndex(const QString &str, int row, int col);
+    void    insertToIndex(const QString &protocol, const QString &str, int row, int col);
     void    checkArp(SniffedPacket &packet);
     void    refreshArp();
 
-    char                        mac[6];
-    std::string                 ip;
+    char                        _mac[6];
+    std::string                 _ip;
     std::list<SniffedPacket *>  Packets;
     QThread                     *thread;
     Sniffer                     *sniffer;
@@ -59,6 +59,7 @@ private:
     client_t                    *client2;
     std::string                 interface;
     int                         counter;
+    int                         _socket_arp;
 
 private slots:
     void    ToggleSniffer();

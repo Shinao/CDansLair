@@ -3,9 +3,11 @@
 #include "mainwindow.h"
 #include "Sniffer.h"
 
-DialogInterface::DialogInterface(QWidget *parent) :
+DialogInterface::DialogInterface(QWidget *parent, std::string &ip, char *mac) :
     QDialog(parent),
-    ui(new Ui::DialogInterface)
+    ui(new Ui::DialogInterface),
+    _ip(ip),
+    _mac(mac)
 {
     ui->setupUi(this);
 
@@ -75,13 +77,28 @@ void    DialogInterface::startSniffing()
 {
     QItemSelectionModel *select = ui->tableWidget->selectionModel();
 
-    int column = 1;
+    int column_ip = 1;
+    int column_interface = 1;
 #ifdef __linux__
-    column = 0;
+    column_ip = 1;
+   column_interface = 0;
 #endif
 
     if (select->hasSelection())
-        ((MainWindow *)this->parentWidget())->StartSniffing(ui->tableWidget->item(select->selectedRows().at(0).row(), column)->text().toStdString());
+    {
+        std::string interface = ui->tableWidget->item(select->selectedRows().at(0).row(), column_interface)->text().toStdString();
+        _ip = ui->tableWidget->item(select->selectedRows().at(0).row(), column_ip)->text().toStdString();
+
+#ifdef __linux__
+        struct ifreq ifr;
+        int fd = socket(PF_INET, SOCK_DGRAM, IPPROTO_IP);
+        strcpy(ifr.ifr_name, interface.c_str());
+        if (fd >= 0 && ioctl(fd, SIOCGIFHWADDR, &ifr) == 0)
+            memcpy(_mac, ifr.ifr_hwaddr.sa_data, 6);
+#endif
+
+        ((MainWindow *)this->parentWidget())->StartSniffing(interface);
+    }
 }
 
 void    DialogInterface::insertToIndex(const QString &str, int row, int col)
