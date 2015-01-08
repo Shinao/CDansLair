@@ -209,12 +209,34 @@ void                MainWindow::BlockIp()
 
 void    MainWindow::Block(const std::string &ip)
 {
+#ifdef __linux__
+    if (ip.length() > 20)
+        return;
+
     _blocked_ip.push_back(ip);
+
+    char    str_cmd[100];
+    str_cmd = strcat(str_cmd, "iptables -A INPUT -s ");
+    str_cmd = strcat(str_cmd, ip.c_str());
+    str_cmd = strcat(str_cmd, " -j DROP");
+    system(str_cmd);
+#endif
 }
 
 void    MainWindow::Unblock(const std::string &ip)
 {
+#ifdef __linux__
+    if (ip.length() > 20)
+        return;
+
     _blocked_ip.remove(ip);
+
+    char    str_cmd[100];
+    str_cmd = strcat(str_cmd, "iptables -D INPUT -s ");
+    str_cmd = strcat(str_cmd, ip.c_str());
+    str_cmd = strcat(str_cmd, " -j DROP");
+    system(str_cmd);
+#endif
 }
 
 void                  MainWindow::Load()
