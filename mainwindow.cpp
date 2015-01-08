@@ -237,6 +237,9 @@ void                  MainWindow::Load()
     file.read (memblock, size);
     file.close();
 
+    if (size < sizeof(pcap_hdr_t))
+        return ;
+
     pcap_hdr_t	&hdr = *(pcap_hdr_t *) memblock;
     if (hdr.magic_number != 0xa1b2c3d4)
     {
@@ -247,12 +250,18 @@ void                  MainWindow::Load()
     char *cursor = memblock + sizeof(hdr);
     pcaprec_hdr_t *hdrp;
 
+    if (size < sizeof(hdr) + sizeof(hdrp))
+        return;
+
     while ((int) (cursor - memblock) < size)
     {
       hdrp = (pcaprec_hdr_t *) cursor;
 
       cursor += sizeof(*hdrp);
       char  *data = cursor;
+
+      if (size < cursor - memblock + hdrp->incl_len)
+          return;
 
       Sniffer::ManagePacket(data, hdrp->incl_len, true);
       cursor += hdrp->incl_len;
