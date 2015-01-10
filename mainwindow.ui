@@ -105,6 +105,13 @@
        </widget>
       </item>
       <item>
+       <widget class="QPushButton" name="pb_redirect">
+        <property name="text">
+         <string>Redirect</string>
+        </property>
+       </widget>
+      </item>
+      <item>
        <widget class="QPushButton" name="pb_block">
         <property name="text">
          <string>Block IP</string>

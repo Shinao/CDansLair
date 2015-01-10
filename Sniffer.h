@@ -154,6 +154,7 @@ struct SniffedPacket
     bool        has_ether_hdr;
     int         sport;
     int         dport;
+    int         iphdr_size;
 };
 
 class Sniffer : public QObject

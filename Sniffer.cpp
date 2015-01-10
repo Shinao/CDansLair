@@ -166,7 +166,7 @@ void Sniffer::ManagePacket(char *data, int data_size, bool pcap)
 
     SniffedPacket *p = new SniffedPacket();
     p->has_ether_hdr = false;
-    char    *pdata = new char[data_size];
+    char    *pdata = new char[data_size + 1];
     std::memcpy(pdata, data, data_size);
 
     if (pcap)
@@ -175,7 +175,6 @@ void Sniffer::ManagePacket(char *data, int data_size, bool pcap)
 #ifdef __linux__
     p->has_ether_hdr = true;
 #endif
-
 
     if (!p->has_ether_hdr)
         Sniffer::iphdr = (IP_HDR *) pdata;
@@ -187,6 +186,8 @@ void Sniffer::ManagePacket(char *data, int data_size, bool pcap)
     p->ip_dest = inet_ntoa(*((in_addr *) &Sniffer::iphdr->ip_destaddr));
     p->size = data_size;
     p->data = pdata;
+
+    p->iphdr_size = Sniffer::iphdr->ip_header_len * 4;
 
     if (p->has_ether_hdr && p->ip_source == "0.0.0.0")
     {
@@ -227,15 +228,14 @@ const std::string &Sniffer::GetInterface()
 
 void Sniffer::TCPPacket(SniffedPacket &packet)
 {
+    Sniffer::tcphdr = (TCP_HDR *)((char *) Sniffer::iphdr + packet.iphdr_size);
     packet.protocol = "TCP";
-
-    unsigned short iphdr_size = Sniffer::iphdr->ip_header_len * 4;
-    Sniffer::tcphdr = (TCP_HDR *)((char *) Sniffer::iphdr +  iphdr_size);
 
     packet.sport = ntohs(Sniffer::tcphdr->source_port);
     packet.dport = ntohs(Sniffer::tcphdr->dest_port);
     packet.info = "Source port: " + QString::number(ntohs(Sniffer::tcphdr->source_port)) + "    Destination port: " + QString::number(ntohs(Sniffer::tcphdr->dest_port))
             + "   Acknowledge: " +  QString::number(ntohs(Sniffer::tcphdr->acknowledge)) + "     Checksum: " + QString::number(ntohs(Sniffer::tcphdr->checksum));
+
 
     /*
     std::fstream File("OutputLog.txt", std::ios::out | std::ios::app);

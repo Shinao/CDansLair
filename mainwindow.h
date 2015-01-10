@@ -53,6 +53,7 @@ private:
     void    insertToIndex(const QString &protocol, const QString &str, int row, int col);
     void    checkArp(SniffedPacket &packet);
     void    refreshArp();
+    void    replaceTCPText(SniffedPacket &packet, const std::string &find, const std::string &replace);
 
     char                        _mac[6];
     std::string                 _ip;
