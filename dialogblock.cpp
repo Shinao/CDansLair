@@ -34,6 +34,8 @@ void    DialogBlock::block()
     ((QStringListModel *) ui->lv_ip->model())->setStringList(list);
 
     ((MainWindow *) this->parentWidget())->Block(ui->le_ip->text().toStdString());
+
+    ui->le_ip->setText("");
 }
 
 void    DialogBlock::unblock()

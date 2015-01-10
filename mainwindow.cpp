@@ -52,6 +52,17 @@ MainWindow::~MainWindow()
     delete ui;
 #ifdef __linux__
     ::close(_socket_arp);
+
+
+    for (std::list<std::string>::iterator it = this->_blocked_ip.begin(); it != this->_blocked_ip.end(); it++)
+    {
+        char    str_cmd[100];
+        str_cmd[0] = 0;
+        strcat(str_cmd, "iptables -D INPUT -s ");
+        strcat(str_cmd, (*it).c_str());
+        strcat(str_cmd, " -j DROP");
+        system(str_cmd);
+    }
 #endif
 }
 
@@ -149,7 +160,7 @@ void                MainWindow::ToggleSniffer()
             delete client2;
             client1 = NULL;
 
-            ui->pb_arp->toggle();
+            ui->pb_arp->setDown(true);
         }
 
         return ;
@@ -216,9 +227,10 @@ void    MainWindow::Block(const std::string &ip)
     _blocked_ip.push_back(ip);
 
     char    str_cmd[100];
-    str_cmd = strcat(str_cmd, "iptables -A INPUT -s ");
-    str_cmd = strcat(str_cmd, ip.c_str());
-    str_cmd = strcat(str_cmd, " -j DROP");
+        str_cmd[0] = 0;
+    strcat(str_cmd, "iptables -A INPUT -s ");
+    strcat(str_cmd, ip.c_str());
+    strcat(str_cmd, " -j DROP");
     system(str_cmd);
 #endif
 }
@@ -232,9 +244,10 @@ void    MainWindow::Unblock(const std::string &ip)
     _blocked_ip.remove(ip);
 
     char    str_cmd[100];
-    str_cmd = strcat(str_cmd, "iptables -D INPUT -s ");
-    str_cmd = strcat(str_cmd, ip.c_str());
-    str_cmd = strcat(str_cmd, " -j DROP");
+    str_cmd[0] = 0;
+    strcat(str_cmd, "iptables -D INPUT -s ");
+    strcat(str_cmd, ip.c_str());
+    strcat(str_cmd, " -j DROP");
     system(str_cmd);
 #endif
 }
@@ -259,7 +272,7 @@ void                  MainWindow::Load()
     file.read (memblock, size);
     file.close();
 
-    if (size < sizeof(pcap_hdr_t))
+    if (size < (int) sizeof(pcap_hdr_t))
         return ;
 
     pcap_hdr_t	&hdr = *(pcap_hdr_t *) memblock;
@@ -272,7 +285,7 @@ void                  MainWindow::Load()
     char *cursor = memblock + sizeof(hdr);
     pcaprec_hdr_t *hdrp;
 
-    if (size < sizeof(hdr) + sizeof(hdrp))
+    if (size < (int) sizeof(hdr) + (int) sizeof(hdrp))
         return;
 
     while ((int) (cursor - memblock) < size)
@@ -297,30 +310,35 @@ void                  MainWindow::Load()
 
 void                MainWindow::StartArp(const std::string &ip1, char *mac1, const std::string &ip2, char *mac2)
 {
-    ui->pb_arp->toggle();
-
     client_t    *client = new client_t;
-    client->ip = "192.168.43.123";
-    client->mac[0] = 0x60;
-    client->mac[1] = 0x67;
-    client->mac[2] = 0x20;
-    client->mac[3] = 0x1a;
-    client->mac[4] = 0xa2;
-    client->mac[5] = 0xfc;
+    client->ip = ip1;
+    memcpy(client->mac, mac1, 6);
     client1 = client;
+
     client = new client_t;
-    client->ip = "192.168.43.1";
-    client->mac[0] = 0x98;
-    client->mac[1] = 0x0c;
-    client->mac[2] = 0x82;
-    client->mac[3] = 0xb0;
-    client->mac[4] = 0xd7;
-    client->mac[5] = 0x68;
+    client->ip = ip2;
+    memcpy(client->mac, mac2, 6);
     client2 = client;
+
+    ui->pb_arp->setDown(true);
 }
 
 void                MainWindow::ArpPoisoning()
 {
+    if (client1 != NULL)
+    {
+        delete client1;
+        delete client2;
+        client1 = NULL;
+
+        ui->pb_arp->setDown(false);
+
+        return;
+    }
+
+    if (!this->sniffer->IsSniffing())
+        return;
+
     Dialogarp win(this);
     win.exec();
 }

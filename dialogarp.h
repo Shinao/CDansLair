@@ -2,6 +2,7 @@
 #define DIALOGARP_H
 
 #include <QDialog>
+#include "mainwindow.h"
 
 namespace Ui {
 class Dialogarp;
@@ -17,6 +18,10 @@ public:
 
 private:
     Ui::Dialogarp *ui;
+    std::vector<client_t *>   clients;
+
+private slots:
+    void    StartArp();
 };
 
 #endif // DIALOGARP_H

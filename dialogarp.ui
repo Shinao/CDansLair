@@ -29,7 +29,7 @@
     <set>QDialogButtonBox::Cancel|QDialogButtonBox::Ok</set>
    </property>
   </widget>
-  <widget class="QListView" name="listView">
+  <widget class="QListView" name="lv_client">
    <property name="geometry">
     <rect>
      <x>10</x>
@@ -37,6 +37,9 @@
      <width>361</width>
      <height>221</height>
     </rect>
+   </property>
+   <property name="selectionMode">
+    <enum>QAbstractItemView::MultiSelection</enum>
    </property>
   </widget>
   <widget class="QLabel" name="label">
