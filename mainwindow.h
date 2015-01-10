@@ -5,6 +5,7 @@
 #include <QtGui>
 #include <iostream>
 #include <fstream>
+
 #include "Sniffer.h"
 
 typedef struct pcap_hdr_s {

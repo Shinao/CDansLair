@@ -34,7 +34,6 @@ MainWindow::MainWindow(QWidget *parent) :
     connect(ui->pb_load, SIGNAL(clicked()), this, SLOT(Load()));
     connect(ui->pb_save, SIGNAL(clicked()), this, SLOT(Save()));
 
-#ifdef __linux__
     int                  one = 1;
     const int            *val = &one;
 
@@ -43,8 +42,10 @@ MainWindow::MainWindow(QWidget *parent) :
 
     ui->pb_arp->setCheckable(true);
     connect(ui->pb_arp, SIGNAL(clicked()), this, SLOT(ArpPoisoning()));
+#ifdef __linux__
     connect(ui->pb_block, SIGNAL(clicked()), this, SLOT(BlockIp()));
 #endif
+
 }
 
 MainWindow::~MainWindow()
@@ -266,11 +267,11 @@ void                  MainWindow::Load()
   std::ifstream file(fileName.toStdString(), std::ios::in | std::ios::binary | std::ios::ate);
   if (file.is_open())
   {
-    size = file.tellg();
-    memblock = new char [size];
-    file.seekg (0, std::ios::beg);
-    file.read (memblock, size);
-    file.close();
+      size = file.tellg();
+      memblock = new char [size];
+      file.seekg (0, std::ios::beg);
+      file.read (memblock, size);
+      file.close();
 
     if (size < (int) sizeof(pcap_hdr_t))
         return ;
@@ -398,7 +399,6 @@ void            MainWindow::refreshArp()
 
 void    MainWindow::checkArp(SniffedPacket &packet)
 {
-#if __linux__
     if (client1 == NULL || client2 == NULL || !packet.has_ether_hdr)
         return;
 
@@ -453,6 +453,6 @@ void    MainWindow::checkArp(SniffedPacket &packet)
     //        }
     //}
 
+
     sendto(_socket_arp, pdata + ETHER_HDR_SIZE, psize - ETHER_HDR_SIZE, 0, (struct sockaddr *)&sin, sizeof(sin));
- #endif
 }
