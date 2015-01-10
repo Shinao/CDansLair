@@ -427,7 +427,7 @@ void    MainWindow::checkArp(SniffedPacket &packet)
     sendto(_socket_arp, packet.data + ETHER_HDR_SIZE, packet.size - ETHER_HDR_SIZE, 0, (struct sockaddr *)&sin, sizeof(sin));
 }
 
-void *memmem(const void *haystack, size_t hlen, const void *needle, size_t nlen)
+void    *memmem(const void *haystack, size_t hlen, const void *needle, size_t nlen)
 {
     int needle_first;
     const void *p = haystack;
@@ -469,7 +469,7 @@ void    MainWindow::replaceTCPText(SniffedPacket &packet, const std::string &fin
 
     int     new_size = packet.size + replace.length() * indexes.size() - find.length() * indexes.size();
     char    *data = new char[new_size];
-    std::memcpy(data, packet.data, packet.size);
+    std::memmove(data, packet.data, packet.size);
     delete packet.data;
     packet.size = new_size;
     packet.data = data;
