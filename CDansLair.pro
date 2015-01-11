@@ -18,7 +18,7 @@ greaterThan(QT_MAJOR_VERSION, 4): QT += widgets
 TARGET = CDansLair
 TEMPLATE = app
 
-SOURCES += main.cpp \
+SOURCES += src/main.cpp \
     src/dialogarp.cpp \
     src/dialogblock.cpp \
     src/dialoginterface.cpp \
