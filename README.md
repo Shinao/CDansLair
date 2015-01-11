@@ -2,13 +2,12 @@
 
 ####Description
 
-C++ Qt project. Packet Viewer. ARP Poisoning (With modification). Load/Save .PCAP.
-Some other stuff.
+C++ Qt project : Packet Viewer, ARP Poisoning (With modification), Load/Save pcap file format and some other stuff.
 
 ####Dependencies
 
  - Qt
- - Windows / Linux debian
+ - Windows / Linux Debian
 
 ###Licence
 

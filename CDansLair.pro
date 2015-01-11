@@ -18,21 +18,20 @@ greaterThan(QT_MAJOR_VERSION, 4): QT += widgets
 TARGET = CDansLair
 TEMPLATE = app
 
+SOURCES += main.cpp \
+    src/dialogarp.cpp \
+    src/dialogblock.cpp \
+    src/dialoginterface.cpp \
+    src/mainwindow.cpp \
+    src/Sniffer.cpp
 
-SOURCES += main.cpp\
-        mainwindow.cpp \
-    Sniffer.cpp \
-    dialoginterface.cpp \
-    dialogblock.cpp \
-    dialogarp.cpp
+HEADERS += include/dialogarp.h \
+    include/dialogblock.h \
+    include/dialoginterface.h \
+    include/mainwindow.h \
+    include/Sniffer.h
 
-HEADERS  += mainwindow.h \
-    Sniffer.h \
-    dialoginterface.h \
-    dialogblock.h \
-    dialogarp.h
-
-FORMS    += mainwindow.ui \
-    dialoginterface.ui \
-    dialogblock.ui \
-    dialogarp.ui
+FORMS += forms/mainwindow.ui \
+        forms/dialogblock.ui \
+        forms/dialogarp.ui \
+        forms/dialoginterface.ui
