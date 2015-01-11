@@ -8,8 +8,3 @@ C++ Qt project : Packet Viewer, ARP Poisoning (With modification), Load/Save pca
 
  - Qt
  - Windows / Linux Debian
-
-###Licence
-
-WTFPL - http://www.wtfpl.net 
-
