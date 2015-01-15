@@ -11,7 +11,11 @@ Dialogarp::Dialogarp(QWidget *parent) :
 
     ui->lv_client->setModel(new QStringListModel());
 
+#ifdef _WIN32
      system("arp -a > arp_dump");
+#elif __linux__
+    system("arp -an > arp_dump");
+#endif
 
      std::ifstream  file("arp_dump");
 
@@ -41,7 +45,7 @@ Dialogarp::Dialogarp(QWidget *parent) :
          clients.push_back(client);
 
          char   smac[6];
-         sscanf_s(mac, "%x:%x:%x:%x:%x:%x",  (unsigned int *) &smac[0], (unsigned int *) &smac[1], (unsigned int *) &smac[2], (unsigned int *) &smac[3], (unsigned int *) &smac[4], (unsigned int *) &smac[5]);
+         sscanf(mac, "%x:%x:%x:%x:%x:%x",  (unsigned int *) &smac[0], (unsigned int *) &smac[1], (unsigned int *) &smac[2], (unsigned int *) &smac[3], (unsigned int *) &smac[4], (unsigned int *) &smac[5]);
          memcpy(client->mac, smac, 6);
      }
 

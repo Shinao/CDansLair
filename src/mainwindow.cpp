@@ -16,7 +16,6 @@ MainWindow::MainWindow(QWidget *parent) :
     ui->pb_arp->setCheckable(true);
     ui->pb_arp->setEnabled(false);
     ui->pb_redirect->setCheckable(true);
-    ui->pb_redirect->setDown(true);
     ui->tableWidget->setSelectionBehavior(QAbstractItemView::SelectRows);
     client1 = NULL;
     client2 = NULL;

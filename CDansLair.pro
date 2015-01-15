@@ -13,6 +13,10 @@ DEFINES += WIN32_LEAN_AND_MEAN
 unix:QMAKE_CXXFLAGS += -std=c++11
 win32:LIBS += -lws2_32
 
+INCLUDEPATH += include \
+            src \
+            forms
+
 greaterThan(QT_MAJOR_VERSION, 4): QT += widgets
 
 TARGET = CDansLair
