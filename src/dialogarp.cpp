@@ -9,8 +9,6 @@ Dialogarp::Dialogarp(QWidget *parent) :
 
     connect(ui->buttonBox, SIGNAL(accepted()), this, SLOT(StartArp()));
 
-    ui->lv_client->setModel(new QStringListModel());
-
 #ifdef _WIN32
      system("arp -a > arp_dump");
 #elif __linux__
@@ -49,12 +47,12 @@ Dialogarp::Dialogarp(QWidget *parent) :
          memcpy(client->mac, smac, 6);
      }
 
-
+     QStringListModel *model = new QStringListModel();
      QStringList list;
-     list = ((QStringListModel *) ui->lv_client->model())->stringList();
      for (std::vector<client_t *>::iterator it = clients.begin(); it != clients.end(); it++)
-         list.append((*it)->ip.c_str());
-     ((QStringListModel *) ui->lv_client->model())->setStringList(list);
+         list << ((*it)->ip.c_str());
+     model->setStringList(list);
+     ui->lv_client->setModel(model);
 }
 
 Dialogarp::~Dialogarp()
