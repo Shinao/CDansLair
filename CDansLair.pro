@@ -10,6 +10,7 @@ QT       += core gui
 
 DEFINES += WIN32_LEAN_AND_MEAN
 
+CONFIG += c++11
 unix:QMAKE_CXXFLAGS += -std=c++11
 win32:LIBS += -lws2_32
 
