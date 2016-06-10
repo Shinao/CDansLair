@@ -25,7 +25,6 @@ addons:
     packages:
     - gcc-4.8
     - g++-4.8
-    install:
 
 script:
   - $CXX --version
