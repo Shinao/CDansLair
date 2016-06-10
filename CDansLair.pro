@@ -17,6 +17,7 @@ linux-g++ | linux-g++-64 | linux-g++-32 {
     QMAKE_CC = gcc-4.8
 }
 win32:LIBS += -lws2_32
+QMAKE_CXXFLAGS_CXX11    = -std=c++11
 
 INCLUDEPATH += include \
             src \
