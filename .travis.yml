@@ -1,20 +1,9 @@
 language: cpp
 
-compiler:
-- clang
-- gcc
+compiler: gcc
 
 env:
 - QT_BASE=53
-- QT_BASE=54
-- QT_BASE=55
-
-matrix:
-  allow_failures:
-  - compiler: clang
-    env: QT_BASE=53
-  - compiler: clang
-    env: QT_BASE=55
 
 before_install:
 - sudo add-apt-repository ppa:ubuntu-toolchain-r/test -y
@@ -25,8 +14,6 @@ before_install:
     wget -O - http://llvm.org/apt/llvm-snapshot.gpg.key | sudo apt-key add -
   fi
 - if [ "$QT_BASE" = "53" ]; then sudo add-apt-repository ppa:beineri/opt-qt532 -y; fi
-- if [ "$QT_BASE" = "54" ]; then sudo add-apt-repository ppa:beineri/opt-qt541 -y; fi
-- if [ "$QT_BASE" = "55" ]; then sudo add-apt-repository ppa:beineri/opt-qt55 -y; fi
 - sudo apt-get update -qq
 
 install:
