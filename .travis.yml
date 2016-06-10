@@ -26,7 +26,7 @@ addons:
 script:
   - $CXX --version
   - g++ --version
-  - export g++="g++-4.8"
+  - export g++="g++-4.8 -std=c++11"
   - g++ --version
   - qmake -project
   - qmake CDansLair.pro
