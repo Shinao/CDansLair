@@ -9,8 +9,8 @@ C++ Qt project main features :
 
 ####Dependencies
 
- - Qt
- - Windows / Linux Debian
+ - Qt5
+ - Windows / Linux
 
 
 #### Notes
