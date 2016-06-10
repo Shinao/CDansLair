@@ -12,10 +12,6 @@ DEFINES += WIN32_LEAN_AND_MEAN
 
 CONFIG += c++11
 unix:QMAKE_CXXFLAGS += -std=c++11
-linux-g++ | linux-g++-64 | linux-g++-32 {
-    QMAKE_CXX = g++-4.8
-    QMAKE_CC = gcc-4.8
-}
 win32:LIBS += -lws2_32
 QMAKE_CXXFLAGS_CXX11    = -std=c++11
 
