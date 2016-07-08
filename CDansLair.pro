@@ -29,15 +29,19 @@ SOURCES += src/main.cpp \
     src/dialogblock.cpp \
     src/dialoginterface.cpp \
     src/mainwindow.cpp \
-    src/Sniffer.cpp
+    src/Sniffer.cpp \
+    src/arpspoofer.cpp
 
 HEADERS += include/dialogarp.h \
     include/dialogblock.h \
     include/dialoginterface.h \
     include/mainwindow.h \
-    include/Sniffer.h
+    include/Sniffer.h \
+    include/arpspoofer.h \
+    include/memoryutil.h
 
 FORMS += forms/mainwindow.ui \
         forms/dialogblock.ui \
         forms/dialogarp.ui \
-        forms/dialoginterface.ui
+        forms/dialoginterface.ui \
+    forms/dialogarp_options.ui

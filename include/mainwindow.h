@@ -7,6 +7,7 @@
 #include <fstream>
 
 #include "Sniffer.h"
+#include "arpspoofer.h"
 
 typedef struct pcap_hdr_s {
         unsigned magic_number;   /* magic number */
@@ -24,11 +25,6 @@ typedef struct pcaprec_hdr_s {
         unsigned incl_len;       /* number of octets of packet saved in file */
         unsigned orig_len;       /* actual length of packet */
 } pcaprec_hdr_t;
-
-typedef struct client_s {
-    std::string ip;
-    char        mac[6];
-}               client_t;
 
 namespace Ui {
 class MainWindow;
@@ -51,21 +47,16 @@ public:
 private:
     void    insertPacket(SniffedPacket &packet);
     void    insertToIndex(const QString &protocol, const QString &str, int row, int col);
-    void    checkArp(SniffedPacket &packet);
-    void    refreshArp();
-    int     replaceTCPText(SniffedPacket &packet, const std::string &find, const std::string &replace);
 
-    char                        _mac[6];
-    std::string                 _ip;
+    ArpSpoofer                  _arp_spoofer;
+    char                        _local_mac[6];
+    std::string                 _local_ip;
     std::list<SniffedPacket *>  Packets;
     QThread                     *thread;
     Sniffer                     *sniffer;
     Ui::MainWindow              *ui;
-    client_t                    *client1;
-    client_t                    *client2;
     std::string                 interface;
     int                         counter;
-    int                         _socket_arp;
 
 private slots:
     void    ToggleSniffer();
