@@ -39,6 +39,7 @@ public:
     ~MainWindow();
 
     void    StartSniffing(const std::string &interface);
+    void    ArpOptionsSet();
     void    Block(const std::string &ip);
     void    Unblock(const std::string &ip);
     void    StartArp(const std::string &ip1, char *mac1, const std::string &ip2, char *mac2);
@@ -66,6 +67,7 @@ private slots:
     void    Load();
     void    ArpPoisoning();
     void    BlockIp();
+    void    ArpOptions();
 };
 
 #endif // MAINWINDOW_H

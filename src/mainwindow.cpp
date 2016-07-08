@@ -4,6 +4,7 @@
 #include "dialoginterface.h"
 #include "dialogblock.h"
 #include "dialogarp.h"
+#include "dialogarp_options.h"
 #include <QFileDialog>
 #include <cstdlib>
 
@@ -15,7 +16,6 @@ MainWindow::MainWindow(QWidget *parent) :
     ui->pb_scroll->setCheckable(true);
     ui->pb_arp->setCheckable(true);
     ui->pb_arp->setEnabled(false);
-    ui->pb_redirect->setCheckable(true);
     ui->tableWidget->setSelectionBehavior(QAbstractItemView::SelectRows);
     counter = 0;
 
@@ -41,6 +41,7 @@ MainWindow::MainWindow(QWidget *parent) :
 //#ifdef __linux__
     connect(ui->pb_arp, SIGNAL(clicked()), this, SLOT(ArpPoisoning()));
     connect(ui->pb_block, SIGNAL(clicked()), this, SLOT(BlockIp()));
+    connect(ui->pb_arp_options, SIGNAL(clicked()), this, SLOT(ArpOptions()));
 
     ui->pb_block->setEnabled(true);
     _arp_spoofer.Initialize();
@@ -92,7 +93,7 @@ void    MainWindow::getNewPackets()
 
     for (std::list<SniffedPacket *>::iterator it = sniffer->Packets.begin(); it != sniffer->Packets.end(); it++)
     {
-        if (ui->pb_redirect->isChecked())
+        //if (ui->pb_redirect->isChecked())
         _arp_spoofer.ManageNewPacket(*(*it));
         insertPacket(*(*it));
     }
@@ -102,6 +103,11 @@ void    MainWindow::getNewPackets()
         ui->tableWidget->scrollToBottom();
 
     sniffer->mutex.unlock();
+}
+
+void    MainWindow::ArpOptionsSet()
+{
+
 }
 
 void    MainWindow::insertPacket(SniffedPacket &packet)
@@ -177,6 +183,12 @@ void                MainWindow::ToggleSniffer()
     win.exec();
 }
 
+void                  MainWindow::ArpOptions()
+{
+    Dialogarp_options win(this);
+    win.exec();
+}
+
 void                  MainWindow::Save()
 {
     if (this->sniffer->IsSniffing())
@@ -225,7 +237,7 @@ void                MainWindow::BlockIp()
     win.exec();
 }
 
-void    MainWindow::Block(const std::string &ip)
+void                MainWindow::Block(const std::string &ip)
 {
 #ifdef __linux__
     if (ip.length() > 20)

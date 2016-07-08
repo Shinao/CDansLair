@@ -209,3 +209,25 @@ int    ArpSpoofer::ReplaceTCPText(SniffedPacket &packet, const std::string &find
 
     return nb_bytes_added;
 }
+
+void            ArpSpoofer::RedirectTraffic(bool redirect)
+{
+    _redirect_traffic = redirect;
+}
+
+void            ArpSpoofer::RemoveHttpEncoding(bool remove_encoding)
+{
+    _remove_encoding = remove_encoding;
+}
+
+void            ArpSpoofer::ThrottleTraffic(int upload_rate, int download_rate)
+{
+    _upload_rate = upload_rate;
+    _download_rate = download_rate;
+}
+
+void            ArpSpoofer::ReplaceHttpText(const std::string &from, const std::string &to)
+{
+    _replace_from = from;
+    _replace_to = to;
+}

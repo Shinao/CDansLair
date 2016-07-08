@@ -105,9 +105,9 @@
        </widget>
       </item>
       <item>
-       <widget class="QPushButton" name="pb_redirect">
+       <widget class="QPushButton" name="pb_arp_options">
         <property name="text">
-         <string>Redirect</string>
+         <string>ARP Options</string>
         </property>
        </widget>
       </item>
