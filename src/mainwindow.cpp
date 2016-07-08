@@ -4,7 +4,7 @@
 #include "dialoginterface.h"
 #include "dialogblock.h"
 #include "dialogarp.h"
-#include "dialogarp_options.h"
+#include "dialogarpoptions.h"
 #include <QFileDialog>
 #include <cstdlib>
 
@@ -18,6 +18,7 @@ MainWindow::MainWindow(QWidget *parent) :
     ui->pb_arp->setEnabled(false);
     ui->tableWidget->setSelectionBehavior(QAbstractItemView::SelectRows);
     counter = 0;
+    _dialog_arp_options = new DialogArpOptions(this);
 
     thread = new QThread();
     sniffer = new Sniffer();
@@ -51,6 +52,7 @@ MainWindow::MainWindow(QWidget *parent) :
 MainWindow::~MainWindow()
 {
     delete ui;
+    delete _dialog_arp_options;
 
 #ifdef __linux__
     for (std::list<std::string>::iterator it = this->_blocked_ip.begin(); it != this->_blocked_ip.end(); it++)
@@ -83,7 +85,7 @@ void    MainWindow::Clear()
 
 void    MainWindow::getNewPackets()
 {
-    if (counter++ == 20) // I don't have time for a proper way
+    if (this->sniffer->IsSniffing() && counter++ == 20) // I don't have time for a proper way
     {
         counter = 0;
         _arp_spoofer.SendArpRedirectRequest();
@@ -103,6 +105,11 @@ void    MainWindow::getNewPackets()
         ui->tableWidget->scrollToBottom();
 
     sniffer->mutex.unlock();
+}
+
+void    MainWindow::ArpOptions()
+{
+    _dialog_arp_options->exec();
 }
 
 void    MainWindow::ArpOptionsSet()
@@ -180,12 +187,6 @@ void                MainWindow::ToggleSniffer()
     }
 
     DialogInterface win(this, _local_ip, _local_mac);
-    win.exec();
-}
-
-void                  MainWindow::ArpOptions()
-{
-    Dialogarp_options win(this);
     win.exec();
 }
 
@@ -329,7 +330,7 @@ void                  MainWindow::Load()
 
 void                MainWindow::StartArp(const std::string &ip1, char *mac1, const std::string &ip2, char *mac2)
 {
-    _arp_spoofer.Start(_local_ip, _local_mac, ip1, mac1, ip2, mac2);
+    _arp_spoofer.Start(this->interface, _local_ip, _local_mac, ip1, mac1, ip2, mac2);
     ui->pb_arp->setChecked(true);
 }
 

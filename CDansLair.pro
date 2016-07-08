@@ -31,7 +31,7 @@ SOURCES += src/main.cpp \
     src/mainwindow.cpp \
     src/Sniffer.cpp \
     src/arpspoofer.cpp \
-    src/dialogarp_options.cpp
+    src/dialogarpoptions.cpp
 
 HEADERS += include/dialogarp.h \
     include/dialogblock.h \
@@ -40,10 +40,10 @@ HEADERS += include/dialogarp.h \
     include/Sniffer.h \
     include/arpspoofer.h \
     include/memoryutil.h \
-    include/dialogarp_options.h
+    include/dialogarpoptions.h
 
 FORMS += forms/mainwindow.ui \
     forms/dialogblock.ui \
     forms/dialogarp.ui \
     forms/dialoginterface.ui \
-    forms/dialogarp_options.ui
+    forms/dialogarpoptions.ui

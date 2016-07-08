@@ -8,6 +8,7 @@
 
 #include "Sniffer.h"
 #include "arpspoofer.h"
+#include "dialogarpoptions.h"
 
 typedef struct pcap_hdr_s {
         unsigned magic_number;   /* magic number */
@@ -58,6 +59,7 @@ private:
     Ui::MainWindow              *ui;
     std::string                 interface;
     int                         counter;
+    DialogArpOptions            *_dialog_arp_options;
 
 private slots:
     void    ToggleSniffer();

