@@ -73,8 +73,15 @@ typedef struct eth_hdr {
 
 typedef struct ip_hdr
 {
+#if __BYTE_ORDER == __LITTLE_ENDIAN
     unsigned char ip_header_len :4;
     unsigned char ip_version :4;
+#elif __BYTE_ORDER == __BIG_ENDIAN
+    unsigned char ip_version :4;
+    unsigned char ip_header_len :4;
+#else
+# error "Your systems ENDIANNESS is broken, please fix!"
+#endif
     unsigned char ip_tos;
     unsigned short ip_total_length;
     unsigned short ip_id;
