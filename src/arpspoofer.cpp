@@ -52,7 +52,7 @@ void     ArpSpoofer::Stop()
 void     ArpSpoofer::ManageNewPacket(SniffedPacket &packet)
 {
 #ifdef __linux__
-    if (_client1 == NULL || _client2 == NULL || !packet.has_ether_hdr)
+    if (!_arp_options->redirect_traffic || _client1 == NULL || _client2 == NULL || !packet.has_ether_hdr)
         return;
 
     eth_hdr_t *eth = (eth_hdr_t *) packet.data;
@@ -63,10 +63,12 @@ void     ArpSpoofer::ManageNewPacket(SniffedPacket &packet)
         return ;
 
     int nb_bytes_added = 0;
-    //nb_bytes_added += replaceTCPText(packet, "img src=", "img src=\"http://upload.wikimedia.org/wikipedia/fr/f/fb/C-dans-l'air.png\" "); // 65
-    nb_bytes_added += ReplaceTCPText(packet, "Accept-Encoding:", "Accept-Rubbish!:");
-    nb_bytes_added += ReplaceTCPText(packet, "Pronote", "Hacking");
-    qDebug("Replaced %d bytes", nb_bytes_added);
+    if (_arp_options->remove_encoding)
+        nb_bytes_added += ReplaceTCPText(packet, "Accept-Encoding:", "Accept-Rubbish!:");
+    if (!_arp_options->replace_from.empty())
+        nb_bytes_added += ReplaceTCPText(packet, _arp_options->replace_from, _arp_options->replace_to);
+    if (!nb_bytes_added)
+        qDebug("Replaced %d bytes", nb_bytes_added);
 
     IP_HDR  *ip_hdr = (IP_HDR *) (packet.data + ETHER_HDR_SIZE);
     struct sockaddr_in   sin;
