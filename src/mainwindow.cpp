@@ -112,9 +112,9 @@ void    MainWindow::ArpOptions()
     _dialog_arp_options->exec();
 }
 
-void    MainWindow::ArpOptionsSet()
+void    MainWindow::ArpOptionsSet(arp_options_t *arp_options)
 {
-
+    _arp_spoofer.SetArpOptions(arp_options);
 }
 
 void    MainWindow::insertPacket(SniffedPacket &packet)

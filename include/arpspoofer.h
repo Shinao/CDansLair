@@ -2,6 +2,7 @@
 #define ARPSPOOFER_H
 
 #include "Sniffer.h"
+#include "arpoptions.h"
 
 typedef struct client_s {
     std::string ip;
@@ -19,10 +20,7 @@ public:
     void            ManageNewPacket(SniffedPacket &packet);
     void            SendArpRedirectRequest();
     int             ReplaceTCPText(SniffedPacket &packet, const std::string &find, const std::string &replace);
-    void            RedirectTraffic(bool redirect);
-    void            RemoveHttpEncoding(bool remove_encoding);
-    void            ThrottleTraffic(int upload_rate, int download_rate);
-    void            ReplaceHttpText(const std::string &from, const std::string &to);
+    void            SetArpOptions(arp_options_t *arp_options);
 
 private:
     std::string     _interface;
@@ -31,13 +29,7 @@ private:
     int             _socket_arp;
     client_t        *_client1;
     client_t        *_client2;
-
-    std::string     _replace_from;
-    std::string     _replace_to;
-    bool            _remove_encoding;
-    bool            _redirect_traffic;
-    int             _download_rate;
-    int             _upload_rate;
+    arp_options_t   *_arp_options;
 };
 
 #endif // ARPSPOOFER_H

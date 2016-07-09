@@ -40,7 +40,8 @@ HEADERS += include/dialogarp.h \
     include/Sniffer.h \
     include/arpspoofer.h \
     include/memoryutil.h \
-    include/dialogarpoptions.h
+    include/dialogarpoptions.h \
+    include/arpoptions.h
 
 FORMS += forms/mainwindow.ui \
     forms/dialogblock.ui \
