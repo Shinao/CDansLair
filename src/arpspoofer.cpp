@@ -24,10 +24,14 @@ void    ArpSpoofer::Initialize()
 
     _socket_arp = socket(PF_INET, SOCK_RAW, IPPROTO_RAW);
     setsockopt(_socket_arp, IPPROTO_IP, IP_HDRINCL, (char *) val, sizeof(one));
+
+    _spoofing_in_progress = false;
 }
 
 void     ArpSpoofer::Start(const std::string &interface, const std::string &local_ip, char *local_mac, const std::string &ip1, char *mac1, const std::string &ip2, char *mac2)
 {
+    _spoofing_in_progress = true;
+
     _interface = interface;
 
     _local_mac = local_mac;
@@ -48,19 +52,21 @@ void     ArpSpoofer::Start(const std::string &interface, const std::string &loca
 
 void     ArpSpoofer::Stop()
 {
-    if (_client1 != NULL)
-    {
-        delete _client1;
-        _client1 = NULL;
-        delete _client2;
-        _client2 = NULL;
-    }
+    if (!_spoofing_in_progress)
+        return;
+
+    delete _client1;
+    _client1 = NULL;
+    delete _client2;
+    _client2 = NULL;
+
+    _spoofing_in_progress = false;
 }
 
 void     ArpSpoofer::ManageNewPacket(SniffedPacket &packet)
 {
 #ifdef __linux__
-    if (!_arp_options->redirect_traffic || _client1 == NULL || _client2 == NULL || !packet.has_ether_hdr)
+    if (!_arp_options->redirect_traffic || !_spoofing_in_progress || !packet.has_ether_hdr)
         return;
 
     eth_hdr_t *eth = (eth_hdr_t *) packet.data;
@@ -77,7 +83,7 @@ void     ArpSpoofer::ManageNewPacket(SniffedPacket &packet)
         nb_bytes_added += ReplaceTCPText(packet, "Accept-Encoding:", "Accept-Rubbish!:");
     if (!_arp_options->replace_from.empty())
         nb_bytes_added += ReplaceTCPText(packet, _arp_options->replace_from, _arp_options->replace_to);
-    if (!nb_bytes_added)
+    if (nb_bytes_added)
         qDebug("Replaced %d bytes", nb_bytes_added);
 
     IP_HDR  *ip_hdr = (IP_HDR *) (packet.data + ETHER_HDR_SIZE);
@@ -99,11 +105,12 @@ bool     ArpSpoofer::ThrottleNetworkRateFor(SniffedPacket &packet, bool uploadin
     {
         _kb_downloaded_last_second = 0;
         _kb_uploaded_last_second = 0;
+        _timer.restart();
     }
 
     if (uploading)
     {
-        if (_kb_uploaded_last_second == 0)
+        if (_arp_options->upload_rate == 0)
             return false;
 
         _kb_uploaded_last_second += packet.size;
@@ -111,7 +118,7 @@ bool     ArpSpoofer::ThrottleNetworkRateFor(SniffedPacket &packet, bool uploadin
     }
     else
     {
-        if (_kb_downloaded_last_second == 0)
+        if (_arp_options->download_rate == 0)
             return false;
 
         _kb_downloaded_last_second += packet.size;
@@ -123,7 +130,7 @@ bool     ArpSpoofer::ThrottleNetworkRateFor(SniffedPacket &packet, bool uploadin
 void     ArpSpoofer::SendArpRedirectRequest()
 {
 #ifdef __linux__
-    if (_client1 == NULL || _client2 == NULL )
+    if (!_spoofing_in_progress)
         return;
 
     int                 sock;

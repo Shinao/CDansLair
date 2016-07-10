@@ -26,6 +26,7 @@ public:
 private:
     bool            ThrottleNetworkRateFor(SniffedPacket &packet, bool uploading);
 
+    bool            _spoofing_in_progress;
     std::string     _interface;
     std::string     _local_ip;
     char            *_local_mac;

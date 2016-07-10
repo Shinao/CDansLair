@@ -10,6 +10,8 @@ DialogArpOptions::DialogArpOptions(QWidget *parent) :
 
     connect(ui->buttonBox, SIGNAL(accepted()), this, SLOT(SetArpOptions()));
     connect(ui->buttonBox, SIGNAL(rejected()), this, SLOT(close()));
+
+    SetArpOptions();
 }
 
 DialogArpOptions::~DialogArpOptions()
@@ -19,8 +21,8 @@ DialogArpOptions::~DialogArpOptions()
 
 void    DialogArpOptions::SetArpOptions()
 {
-    _arp_options.download_rate = ui->le_download_rate->text().toInt();
-    _arp_options.upload_rate = ui->le_upload_rate->text().toInt();
+    _arp_options.download_rate = ui->le_download_rate->text().toInt() * 1000;
+    _arp_options.upload_rate = ui->le_upload_rate->text().toInt() * 1000;
     _arp_options.replace_from = ui->le_replace_from->text().toStdString();
     _arp_options.replace_to = ui->le_replace_to->text().toStdString();
     _arp_options.redirect_traffic = ui->cb_redirect_traffic->isChecked();
