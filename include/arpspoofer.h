@@ -3,6 +3,7 @@
 
 #include "Sniffer.h"
 #include "arpoptions.h"
+#include <QElapsedTimer>
 
 typedef struct client_s {
     std::string ip;
@@ -23,6 +24,8 @@ public:
     void            SetArpOptions(arp_options_t *arp_options);
 
 private:
+    bool            ThrottleNetworkRateFor(SniffedPacket &packet, bool uploading);
+
     std::string     _interface;
     std::string     _local_ip;
     char            *_local_mac;
@@ -30,6 +33,9 @@ private:
     client_t        *_client1;
     client_t        *_client2;
     arp_options_t   *_arp_options;
+    int             _kb_downloaded_last_second;
+    int             _kb_uploaded_last_second;
+    QElapsedTimer   _timer;
 };
 
 #endif // ARPSPOOFER_H

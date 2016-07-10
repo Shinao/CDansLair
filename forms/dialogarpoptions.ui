@@ -19,7 +19,7 @@
      <x>30</x>
      <y>230</y>
      <width>41</width>
-     <height>16</height>
+     <height>20</height>
     </rect>
    </property>
    <property name="font">
@@ -37,7 +37,7 @@
      <x>230</x>
      <y>230</y>
      <width>21</width>
-     <height>16</height>
+     <height>20</height>
     </rect>
    </property>
    <property name="font">
@@ -55,7 +55,7 @@
      <x>60</x>
      <y>340</y>
      <width>181</width>
-     <height>16</height>
+     <height>20</height>
     </rect>
    </property>
    <property name="font">
@@ -239,7 +239,7 @@
      <x>60</x>
      <y>370</y>
      <width>191</width>
-     <height>16</height>
+     <height>20</height>
     </rect>
    </property>
    <property name="font">
@@ -259,6 +259,32 @@
      <width>131</width>
      <height>20</height>
     </rect>
+   </property>
+  </widget>
+  <widget class="QLabel" name="label_8">
+   <property name="geometry">
+    <rect>
+     <x>380</x>
+     <y>340</y>
+     <width>59</width>
+     <height>20</height>
+    </rect>
+   </property>
+   <property name="text">
+    <string>kb/s</string>
+   </property>
+  </widget>
+  <widget class="QLabel" name="label_9">
+   <property name="geometry">
+    <rect>
+     <x>380</x>
+     <y>370</y>
+     <width>59</width>
+     <height>20</height>
+    </rect>
+   </property>
+   <property name="text">
+    <string>kb/s</string>
    </property>
   </widget>
  </widget>

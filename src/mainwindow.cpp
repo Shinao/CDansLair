@@ -336,7 +336,7 @@ void                MainWindow::StartArp(const std::string &ip1, char *mac1, con
 
 void                MainWindow::ArpPoisoning()
 {
-    if (ui->pb_arp->isChecked())
+    if (!ui->pb_arp->isChecked())
     {
         _arp_spoofer.Stop();
         ui->pb_arp->setChecked(false);
