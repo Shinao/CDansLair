@@ -4,16 +4,14 @@
 
 C++ portable packet viewer and manipulator with ARP Poisoning.
 
-<br>
-**Preview**
 
+### Preview
 Changing an image from a website and throttling the network traffic
 <p align="center">
  <img width="50%" src="/docs/cdanslair_spoofer.gif"/><img width="50%" src="/docs/cdanslair_target.gif"/>
 </p>
 
-<br>
-**Capacities**
+### Capacities
 - Portable : tried on Ubuntu & Windows 7
 - Packet viewer from network interface
 - ARP Poisoning
@@ -22,14 +20,10 @@ Changing an image from a website and throttling the network traffic
  - Throttle network traffic
 - Import/Export pcap file
 
-<br>
-**Using it**
-
+### Using it
 - Install Qt4+, qtcreator or qmake
 - QtCreator > build or `qmake CDansLair.pro`
 
-<br>
-**Notes**
-
+### Notes
 ARP poisoning only works on Linux : Windows doesn't allow to send custom packets.<br>
 Remember to ping the targeted machines before using the ARP Poisoning to populate your arp table, it's not gonna scan your network on his own.
